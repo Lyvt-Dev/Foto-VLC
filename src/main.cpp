@@ -3,6 +3,7 @@
 #include "updater.hpp"
 #include "motion.hpp"
 #include "edit.hpp"
+#include "resize_dialog.hpp"
 #include "codec_pack.hpp"
 #include <commdlg.h>
 #include "core.hpp"
@@ -31,6 +32,7 @@
 #include <chrono>
 using namespace Gdiplus;
 constexpr UINT Done=WM_APP+1,ThumbDone=WM_APP+2,ExportDone=WM_APP+3,UpdateDone=WM_APP+4,EditDone=WM_APP+5,CodecDone=WM_APP+6;
+constexpr DWORD MainWindowStyle=WS_POPUP|WS_THICKFRAME|WS_MINIMIZEBOX|WS_MAXIMIZEBOX|WS_SYSMENU|WS_CLIPCHILDREN;
 constexpr wchar_t AppClass[]=L"PAFPhotos.Main";
 constexpr wchar_t AppTitle[]=L"PAF-Photos · " FOTO_VERSION_WSTRING;
 enum Action {
@@ -615,7 +617,7 @@ void layoutControls() {
     layoutShell();layoutViewport();
     if(app.decoderPage){
         float x=contentLeft(),w=std::min(850.0f,l.width-x-42);auto phase=app.codecs.snapshot().phase;bool running=phase==CodecPhase::Downloading||phase==CodecPhase::Installing;
-        place(InstallCodecs,{x+24,360,std::min(230.0f,w-48),42},running?tr(L"Wird installiert …"):magickPath().empty()?tr(L"Decoder installieren"):tr(L"Decoder verfügbar"),Icon::Decoder,!running&&magickPath().empty(),false,magickPath().empty());
+        place(InstallCodecs,{x+24,466,std::min(230.0f,w-48),42},running?tr(L"Wird installiert …"):magickPath().empty()?tr(L"Decoder installieren"):tr(L"Erneut installieren"),Icon::Decoder,!running,false,true);
     }else if(app.helpPage>=0) {
         place(CloseHelp,{24,78,112,34},tr(L"Zurück"),Icon::Left);
         float x=std::max(contentLeft(),(w-800)/2),y=198;
@@ -1110,10 +1112,12 @@ void drawEditor(Graphics& g,const foto::ViewerLayout& l){auto r=l.inspector;ui::
 void drawDecoders(Graphics& g,const foto::ViewerLayout& l){float x=contentLeft(),w=std::min(850.0f,l.width-x-42);ui::icon(g,Icon::Decoder,x,112,ui::text,28);ui::label(g,tr(L"Decoder"),{x+42,96,w-42,48},30,ui::text,true);
  ui::round(g,ui::raised,{x,174,w,116});ui::label(g,tr(L"Direkt eingebaut"),{x+24,184,w-48,30},18,ui::text,true);
  ui::label(g,L"PNG · JPEG · BMP · GIF · TIFF · ICO · WebP · SVG · PSD · TGA · QOI\nPCX · DDS (DXT1/3/5, RGB) · PBM/PGM/PPM/PAM · SGI · XBM · HDR",{x+24,220,w-48,58},13,ui::muted,false,false,true);
- auto phase=app.codecs.snapshot().phase;ui::round(g,ui::raised,{x,308,w,122});ui::label(g,tr(L"Zusätzliche Formate"),{x+24,318,w-48,28},18,ui::text,true);
- const wchar_t* status=phase==CodecPhase::Failed?tr(L"Installation fehlgeschlagen. Bitte erneut versuchen."):phase==CodecPhase::Downloading?tr(L"Decoder-Paket wird heruntergeladen …"):phase==CodecPhase::Installing?tr(L"Decoder werden installiert …"):magickPath().empty()?tr(L"AVIF, HEIC, JPEG XL, JPEG 2000, EXR und weitere Varianten."):tr(L"Zusätzliche Decoder sind verfügbar.");
- ui::label(g,status,{x+24,402,w-48,24},12,phase==CodecPhase::Failed?ui::accent:ui::muted);
- ui::label(g,tr(L"Die Installation erfolgt nur für deinen Benutzer. Keine Administratorrechte nötig. Proprietäre Projektformate und PDF können zusätzliche Komponenten benötigen."),{x,448,w,66},13,ui::muted,false,false,true);
+ auto phase=app.codecs.snapshot().phase;ui::round(g,ui::raised,{x,308,w,230});ui::label(g,tr(L"Empfohlen: Erweiterte Bildformate"),{x+24,318,w-48,28},18,ui::text,true);
+ ui::label(g,tr(L"Ein Decoder-Paket für diese Formatgruppen:"),{x+24,356,w-48,24},13,ui::muted);
+ ui::label(g,L"AVIF · HEIC / HEIF · JPEG XL\nJPEG 2000 · OpenEXR · ImageMagick",{x+24,388,w-48,54},15,ui::text,false,false,true);
+ const wchar_t* status=phase==CodecPhase::Failed?tr(L"Installation fehlgeschlagen. Bitte erneut versuchen."):phase==CodecPhase::Downloading?tr(L"Decoder-Paket wird heruntergeladen …"):phase==CodecPhase::Installing?tr(L"Decoder werden installiert …"):magickPath().empty()?tr(L"Noch nicht installiert · Kostenloser Download"):tr(L"Installiert · Bei Problemen erneut installieren");
+ ui::label(g,status,{x+24,512,w-48,24},12,phase==CodecPhase::Failed?ui::accent:ui::muted);
+ ui::label(g,tr(L"Die Installation erfolgt nur für deinen Benutzer. Keine Administratorrechte nötig. Proprietäre Projektformate und PDF können zusätzliche Komponenten benötigen."),{x,554,w,66},13,ui::muted,false,false,true);
 }
 void trimHistory(std::vector<EditState>& history){size_t bytes=0;for(const auto& state:history)if(state.picture)bytes+=state.picture->pixels.size();while(history.size()>1&&(bytes>192u*1024*1024||history.size()>20)){bytes-=history.front().picture->pixels.size();history.erase(history.begin());}}
 void queueEdit(const paf::EditOptions& options){if(!app.picture||app.busy||app.editBusy||app.exporting)return;EditState before{app.picture,app.rotation,app.mirrored};app.undo.push_back(before);trimHistory(app.undo);app.redo.clear();app.editBusy=true;app.exportNotice=false;app.notice.clear();
@@ -1123,10 +1127,11 @@ void editingCommand(int id){if(!app.picture||app.busy||app.editBusy||app.exporti
  if(id==ResetEdits){if(app.originalPicture){app.undo.push_back({app.picture,app.rotation,app.mirrored});trimHistory(app.undo);app.redo.clear();app.picture=app.originalPicture;app.rotation=0;app.mirrored=false;app.fit=true;app.panX=app.panY=0;refresh();}return;}
  paf::EditOptions options;
  switch(id){case BrightDown:options.brightness=-10;break;case BrightUp:options.brightness=10;break;case ContrastDown:options.contrast=.9;break;case ContrastUp:options.contrast=1.1;break;case SaturationDown:options.saturation=.8;break;case SaturationUp:options.saturation=1.2;break;case Grayscale:options.saturation=0;break;case Sepia:options.sepia=true;break;
- case Crop:case Resize:{HMENU menu=CreatePopupMenu();const wchar_t* crops[]={L"1:1",L"4:3",L"16:9",L"3:4"};const wchar_t* sizes[]={L"75 %",L"50 %",L"25 %",L"1920 px",L"1280 px"};int count=id==Crop?4:5;for(int i=0;i<count;++i)AppendMenuW(menu,MF_STRING,i+1,id==Crop?crops[i]:sizes[i]);RECT bounds{};GetWindowRect(app.controls[id].window,&bounds);int choice=int(TrackPopupMenu(menu,TPM_RETURNCMD,bounds.left,bounds.bottom,0,app.window,nullptr));DestroyMenu(menu);if(choice<1||choice>count)return;
+ case Resize:{unsigned w=app.rotation%2?app.picture->height:app.picture->width,h=app.rotation%2?app.picture->width:app.picture->height;
+ auto size=paf::showResizeDialog(app.window,w,h,ui::surface.ToCOLORREF(),ui::text.ToCOLORREF());if(!size)return;options.width=size->first;options.height=size->second;break;}
+ case Crop:{HMENU menu=CreatePopupMenu();const wchar_t* crops[]={L"1:1",L"4:3",L"16:9",L"3:4"};for(int i=0;i<4;++i)AppendMenuW(menu,MF_STRING,i+1,crops[i]);RECT bounds{};GetWindowRect(app.controls[id].window,&bounds);int choice=int(TrackPopupMenu(menu,TPM_RETURNCMD,bounds.left,bounds.bottom,0,app.window,nullptr));DestroyMenu(menu);if(choice<1||choice>4)return;
   unsigned w=app.rotation%2?app.picture->height:app.picture->width,h=app.rotation%2?app.picture->width:app.picture->height;
-  if(id==Crop){double ratios[]={1.0,4.0/3,16.0/9,3.0/4};double ratio=ratios[choice-1];options.cropW=std::max(1u,std::min(w,unsigned(std::floor(h*ratio))));options.cropH=std::max(1u,std::min(h,unsigned(std::floor(w/ratio))));options.cropX=(w-options.cropW)/2;options.cropY=(h-options.cropH)/2;}
-  else{double factors[]={.75,.5,.25,1920.0/std::max(w,h),1280.0/std::max(w,h)};double factor=std::min(1.0,factors[choice-1]);options.width=std::max(1u,unsigned(std::round(w*factor)));options.height=std::max(1u,unsigned(std::round(h*factor)));}break;}
+  double ratios[]={1.0,4.0/3,16.0/9,3.0/4};double ratio=ratios[choice-1];options.cropW=std::max(1u,std::min(w,unsigned(std::floor(h*ratio))));options.cropH=std::max(1u,std::min(h,unsigned(std::floor(w/ratio))));options.cropX=(w-options.cropW)/2;options.cropY=(h-options.cropH)/2;break;}
  default:return;
  }queueEdit(options);
 }
@@ -1338,8 +1343,9 @@ void command(int id) {
 }
 LRESULT CALLBACK wndProc(HWND window,UINT message,WPARAM wp,LPARAM lp) {
     switch(message) {
+    case WM_NCACTIVATE:return TRUE;
     case WM_NCCALCSIZE:
-        if(wp){if(IsZoomed(window)&&(GetWindowLongW(window,GWL_STYLE)&WS_THICKFRAME)){auto parameters=reinterpret_cast<NCCALCSIZE_PARAMS*>(lp);UINT dpi=GetDpiForWindow(window);int border=GetSystemMetricsForDpi(SM_CXSIZEFRAME,dpi)+GetSystemMetricsForDpi(SM_CXPADDEDBORDER,dpi);InflateRect(&parameters->rgrc[0],-border,-border);}return 0;}break;
+        if(wp)return 0;break;
     case WM_NCHITTEST:{
         POINT point{GET_X_LPARAM(lp),GET_Y_LPARAM(lp)};RECT outer{};GetWindowRect(window,&outer);UINT dpi=GetDpiForWindow(window);float scale=dpi/96.0f;
         if(!IsZoomed(window)&&(GetWindowLongW(window,GWL_STYLE)&WS_THICKFRAME)){
@@ -1374,7 +1380,8 @@ LRESULT CALLBACK wndProc(HWND window,UINT message,WPARAM wp,LPARAM lp) {
     case WM_THEMECHANGED:case WM_SETTINGCHANGE:refresh();return 0;
     case WM_SIZE:if(wp!=SIZE_MINIMIZED)refresh();return 0;
     case WM_GETMINMAXINFO: {
-        auto info=reinterpret_cast<MINMAXINFO*>(lp);info->ptMinTrackSize={LONG(780*app.dpi/96),LONG(560*app.dpi/96)};return 0;
+        auto info=reinterpret_cast<MINMAXINFO*>(lp);info->ptMinTrackSize={LONG(780*app.dpi/96),LONG(560*app.dpi/96)};
+        MONITORINFO monitor{sizeof(MONITORINFO)};if(GetMonitorInfoW(MonitorFromWindow(window,MONITOR_DEFAULTTONEAREST),&monitor)){info->ptMaxPosition={monitor.rcWork.left-monitor.rcMonitor.left,monitor.rcWork.top-monitor.rcMonitor.top};info->ptMaxSize={monitor.rcWork.right-monitor.rcWork.left,monitor.rcWork.bottom-monitor.rcWork.top};}return 0;
     }
     case WM_DPICHANGED: {
         app.dpi=HIWORD(wp);auto r=reinterpret_cast<RECT*>(lp);SetWindowPos(window,nullptr,r->left,r->top,r->right-r->left,r->bottom-r->top,SWP_NOZORDER|SWP_NOACTIVATE);refresh();return 0;
@@ -1559,7 +1566,7 @@ int selfTest(const fs::path& report) {
     success &=check(foto::recognized("UPPER.PNG") && !foto::recognized("image.png.exe"),"Extension registry");
     WNDCLASSEXW wc{};wc.cbSize=sizeof(wc);wc.lpfnWndProc=wndProc;wc.hInstance=GetModuleHandleW(nullptr);wc.lpszClassName=AppClass;wc.hCursor=LoadCursorW(nullptr,IDC_ARROW);wc.style=CS_DBLCLKS;
     if(RegisterClassExW(&wc)) {
-        HWND window=CreateWindowExW(WS_EX_COMPOSITED,AppClass,L"PAF-Photos · UI-Test",WS_OVERLAPPEDWINDOW|WS_CLIPCHILDREN,0,0,1180,800,nullptr,nullptr,wc.hInstance,nullptr);
+        HWND window=CreateWindowExW(WS_EX_COMPOSITED,AppClass,L"PAF-Photos · UI-Test",MainWindowStyle,0,0,1180,800,nullptr,nullptr,wc.hInstance,nullptr);
         success &=check(window!=nullptr,"Create desktop window");
         if(window) {
             ShowWindow(window,SW_SHOW);
@@ -1651,7 +1658,9 @@ int selfTest(const fs::path& report) {
             success &=check(grayscale&&updateHash(contextPath)==sourceHash,"Background photo edit produces grayscale pixels without modifying source file");command(Undo);success &=check(app.picture==editingSource,"Editor undo restores exact source pixels");command(Redo);success &=check(app.picture!=editingSource,"Editor redo restores edited picture");command(ResetEdits);success &=check(app.picture==editingSource,"Editor reset restores original");
             paf::EditOptions crop;crop.cropW=1;crop.cropH=1;queueEdit(crop);pump();success &=check(app.picture&&app.picture->width==1&&app.picture->height==1,"Editor crop changes actual raster dimensions");paf::EditOptions resize;resize.width=2;resize.height=3;queueEdit(resize);pump();success &=check(app.picture&&app.picture->width==2&&app.picture->height==3,"Editor resize processes pixels in background");
             auto editOutput=outputs/L"edited-copy.png";bool editSaved=app.exportCopy(editOutput,ExportFormat::PNG);pump();auto editDecoded=wicLoad(editOutput);success &=check(editSaved&&editDecoded.image&&editDecoded.image->width==2&&editDecoded.image->height==3&&updateHash(contextPath)==sourceHash,"Saved edited copy decodes correctly and original remains unchanged");
-            command(Edit);command(DecoderPage);success &=check(app.decoderPage&&!IsWindowVisible(app.viewport)&&IsWindowVisible(app.controls[InstallCodecs].window),"Decoder sidebar opens package management without overlapping gallery viewport");command(Gallery);
+            success &=check(!(GetWindowLongW(window,GWL_STYLE)&WS_CAPTION),"Custom window frame has no duplicate native caption buttons");
+            success &=check(paf::resizeDialogSelfTest(window),"Resize dialog locks aspect ratio, rejects invalid sizes and accepts exact pixel dimensions");
+            command(Edit);command(DecoderPage);success &=check(app.decoderPage&&!IsWindowVisible(app.viewport)&&IsWindowVisible(app.controls[InstallCodecs].window),"Decoder sidebar opens package management without overlapping gallery viewport");success &=check(IsWindowEnabled(app.controls[InstallCodecs].window),"Decoder pack installation remains actionable when codecs are already available");command(Gallery);
             auto originalLanguage=app.preferences.language;
             app.preferences.folders={temp.path};app.rebuildLibrary();refresh();
             success &=check(app.filtered.size()>=7,"Imported folder populates gallery");
@@ -1825,7 +1834,7 @@ int WINAPI wWinMain(HINSTANCE instance,HINSTANCE,PWSTR,int show) {
     if(!RegisterClassExW(&wc)){LocalFree(args);ui::releaseBrand();GdiplusShutdown(token);if(SUCCEEDED(co))CoUninitialize();return 1;}
     RECT work{};SystemParametersInfoW(SPI_GETWORKAREA,0,&work,0);
     UINT dpi=GetDpiForSystem();int width=std::min(int(app.preferences.width*dpi/96),int(work.right-work.left)),height=std::min(int(app.preferences.height*dpi/96),int(work.bottom-work.top));
-    HWND window=CreateWindowExW(WS_EX_COMPOSITED,AppClass,AppTitle,WS_OVERLAPPEDWINDOW|WS_CLIPCHILDREN,work.left+(work.right-work.left-width)/2,work.top+(work.bottom-work.top-height)/2,width,height,nullptr,nullptr,instance,nullptr);
+    HWND window=CreateWindowExW(WS_EX_COMPOSITED,AppClass,AppTitle,MainWindowStyle,work.left+(work.right-work.left-width)/2,work.top+(work.bottom-work.top-height)/2,width,height,nullptr,nullptr,instance,nullptr);
     if(!window){LocalFree(args);ui::releaseBrand();GdiplusShutdown(token);if(SUCCEEDED(co))CoUninitialize();return 1;}
     BOOL dark=TRUE;DwmSetWindowAttribute(window,20,&dark,sizeof(dark));
     ui::palette();

@@ -6,6 +6,23 @@ namespace foto {inline std::atomic<bool> english{false};}
 inline const wchar_t* tr(const wchar_t* german){
     if(!foto::english.load())return german;
     static const std::map<std::wstring,const wchar_t*> translations={
+        {L"Erneut installieren",L"Reinstall decoders"},
+        {L"Empfohlen: Erweiterte Bildformate",L"Recommended: Extended image formats"},
+        {L"Ein Decoder-Paket für diese Formatgruppen:",L"One decoder pack for these format groups:"},
+        {L"Noch nicht installiert · Kostenloser Download",L"Not installed · Free download"},
+        {L"Installiert · Bei Problemen erneut installieren",L"Installed · Reinstall if needed"},
+        {L"Bildgröße ändern",L"Resize image"},
+        {L"Breite (Pixel)",L"Width (pixels)"},
+        {L"Höhe (Pixel)",L"Height (pixels)"},
+        {L"Seitenverhältnis beibehalten",L"Keep aspect ratio"},
+        {L"Anwenden",L"Apply"},
+        {L"Abbrechen",L"Cancel"},
+        {L"Original: ",L"Original: "},
+        {L"Neue Größe: ",L"New size: "},
+        {L"Pixelmaße von 1 bis 16384, maximal 32 Megapixel.",L"Enter 1–16384 pixels per dimension, up to 32 megapixels."},
+        {L"Ungültige Größe",L"Invalid size"},
+        {L"Das Original bleibt unverändert. Speichere anschließend eine Kopie.",L"The original stays unchanged. Save a copy after resizing."},
+
         {L"Kopie gespeichert",L"Copy saved"},
         {L"Kopie öffnen",L"Open copy"},
         {L"Im Ordner anzeigen",L"Show in folder"},

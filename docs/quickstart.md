@@ -1,4 +1,4 @@
-# PAF-Photos 0.7.0
+# PAF-Photos 0.7.1
 
 A portable photo gallery and image viewer for Windows 10/11 (64-bit).
 
@@ -97,7 +97,7 @@ but application branding, shortcuts and executable names now use PAF-Photos.
 
 ## Edit a photo
 
-Open a photo and select **Edit / Bearbeiten** (E). Crop uses a centered aspect-ratio selection; Resize keeps the aspect ratio. Adjust brightness, contrast and saturation or choose Black & white / Sepia. Ctrl+Z undoes and Ctrl+Y redoes a change. Original restores the loaded photo. **Save copy** opens the export format and destination choices. Editing runs in the background; changes are kept in memory until exported.
+Open a photo and select **Edit / Bearbeiten** (E). Crop uses a centered aspect-ratio selection; Resize opens width/height fields in pixels, a live dimension summary and an aspect-ratio lock. It can enlarge or reduce the actual image. Unlock the ratio to enter independent dimensions (1–16384 pixels each, up to 32 megapixels). Adjust brightness, contrast and saturation or choose Black & white / Sepia. Ctrl+Z undoes and Ctrl+Y redoes a change. Original restores the loaded photo. **Save copy** opens the export format and destination choices. Editing runs in the background; changes are kept in memory until exported.
 
 ## Gallery context menu
 

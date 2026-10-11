@@ -1,4 +1,4 @@
-# Formatstatus in v0.7.0
+# Formatstatus in v0.7.1
 
 **Neu in 0.7.0:** PCX/PCC (8-Bit-Palette/RGB), DDS (RGB24/RGBA32 und DXT1/3/5), PBM/PGM/PPM/PAM, SGI/RGB/RGBA/BW (8-Bit raw/RLE), XBM und HDR/RGBE sind ohne zusätzliche Installation eingebaut. Das Decoder-Paket kann direkt über die Sidebar installiert werden. WebP ist ebenfalls eingebaut. Im vollständigen ZIP wurden außerdem AVIF, HEIC, JXL, JP2, EXR, DDS und PCX mit echten Dateien und Galerie-Vorschaubildern geprüft. Weitere Varianten bleiben decoderabhängig.
 

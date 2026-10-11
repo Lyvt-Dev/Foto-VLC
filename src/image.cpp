@@ -90,10 +90,10 @@ std::wstring magickPath() {
         if(p.is_absolute() && fs::is_regular_file(p,ec)) return p.wstring();
         return {};
     }
+    {auto directory=userCodecDirectory();auto user=directory/L"magick.exe";std::error_code ec;if(directory.is_absolute()&&fs::is_regular_file(user,ec))return user.wstring();}
     wchar_t application[32768]{};
     DWORD appLength=GetModuleFileNameW(nullptr,application,32768);
     if(appLength&&appLength<32768){auto bundled=fs::path(application).parent_path()/L"codecs"/L"magick.exe";std::error_code ec;if(fs::is_regular_file(bundled,ec))return bundled.wstring();}
-    {auto directory=userCodecDirectory();auto user=directory/L"magick.exe";std::error_code ec;if(directory.is_absolute()&&fs::is_regular_file(user,ec))return user.wstring();}
     // Search PATH explicitly, excluding the working directory from executable lookup.
     wchar_t paths[32768]{};
     length=GetEnvironmentVariableW(L"PATH",paths,32768);
