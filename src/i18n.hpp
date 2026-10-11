@@ -40,7 +40,7 @@ inline const wchar_t* tr(const wchar_t* german){
         {L"Eckenradius",L"Corner radius"},
         {L"Von kantig bis weich gerundet. Die Vorschau ist sofort sichtbar.",L"From square to rounded. See changes immediately."},
         {L"Animationen",L"Animations"},
-        {L"Sanfte Hover-Übergänge. Windows-Bewegungseinstellungen werden beachtet.",L"Smooth hover transitions. Respects Windows motion settings."},
+        {L"Sanfte Hover- und Scroll-Bewegungen. Windows-Bewegungseinstellungen werden beachtet.",L"Smooth hover and scroll motion. Respects Windows motion settings."},
         {L"JPEG-Qualität",L"JPEG quality"},
         {L"Qualität beim Konvertieren. Transparenz wird bei JPEG weiß.",L"Conversion quality. JPEG transparency becomes white."},
         {L"Unterordner einbeziehen",L"Include subfolders"},

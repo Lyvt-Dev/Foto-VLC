@@ -134,6 +134,11 @@ jobs:
           $fixtures = Join-Path $pwd 'tests/fixtures'
           $check = Start-Process (Join-Path $destination 'PAFPhotos.exe') -ArgumentList @('--codec-test', $fixtures, $codecReport) -Wait -PassThru
           if ($check.ExitCode -ne 0) { throw 'Installed codec runtime failed' }
+          # Exercise the upgrade with the actual previously shipped app and helper.
+          Invoke-WebRequest 'https://github.com/Lyvt-Dev/PAF-Photos/releases/download/v0.5.0/setup.exe' -OutFile build/previous-paf-setup.exe
+          if ((Get-FileHash build/previous-paf-setup.exe -Algorithm SHA256).Hash.ToLower() -ne '8a64affc758df6598e5385a2a9a568dbd54208ff5d4768fec268f1e9888bf51a') { throw 'Previous PAF installer checksum mismatch' }
+          $olderPAF = Start-Process build/previous-paf-setup.exe -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=`"$destination`"") -Wait -PassThru
+          if ($olderPAF.ExitCode -ne 0) { throw 'Previous PAF version installation failed' }
           # The updater runs outside the install folder and must wait for the app to exit.
           $prefs = Join-Path $env:LOCALAPPDATA 'PAFPhotos/settings.ini'
           New-Item -ItemType Directory (Split-Path $prefs) -Force | Out-Null
@@ -152,8 +157,9 @@ jobs:
           if (!$app.WaitForExit(10000)) { throw 'Application failed to exit' }
           if (!$update.WaitForExit(60000)) { throw 'Update installation timed out' }
           if ($update.ExitCode -ne 0) { throw "Update installation failed: $($update.ExitCode)" }
+          if ((Get-Item (Join-Path $destination 'PAFPhotos.exe')).VersionInfo.ProductVersion -ne $version) { throw 'Updater did not install current application version' }
           if ((Get-Content $prefs -Raw) -notmatch 'Radius=3') { throw 'Update changed preferences' }
-          'PASS updater waits for app exit, rejects incorrect SHA256, reinstalls complete payload and preserves preferences' | Set-Content dist/updater-self-test.txt
+          'PASS published 0.5.0 updater waits for app exit, rejects incorrect SHA256, upgrades to current version and preserves preferences' | Set-Content dist/updater-self-test.txt
           $uninstall = Start-Process (Join-Path $destination 'unins000.exe') -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART') -Wait -PassThru
           if ($uninstall.ExitCode -ne 0) { throw 'Silent uninstall failed' }
           # Inno's uninstaller loader can finish briefly before its worker exits.

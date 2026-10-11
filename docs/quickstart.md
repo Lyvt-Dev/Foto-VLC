@@ -1,4 +1,4 @@
-# PAF-Photos 0.5.0
+# PAF-Photos 0.6.0
 
 A portable photo gallery and image viewer for Windows 10/11 (64-bit).
 
@@ -41,7 +41,9 @@ Export uses the decoded raster without source metadata or project layers. If a l
 file was downsampled, or has multiple frames/pages, a notice explains the limitation.
 
 Use **Settings** to choose any accent color, corner radius, animations, JPEG quality
-and whether gallery folders include their subfolders. Reduced-motion settings in
+and whether gallery folders include their subfolders. Gallery and settings scroll smoothly
+with pixel movement and gentle deceleration, including small touchpad deltas. Turning
+Animations off also disables scroll motion and honors Windows reduced-motion settings. Reduced-motion settings in
 Windows disable hover animations. Folder scanning is limited to 10,000 images.
 
 For installation, download **setup.exe**. It installs for your user without admin

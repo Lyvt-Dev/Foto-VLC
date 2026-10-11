@@ -1,7 +1,7 @@
 # Abbildungen
 
 Galerie, dunkle/helle Einstellungen und Bildansicht sind echte App-Ansichten.
-Die Screenshots zeigen den tatsächlichen Windows-Build von PAF-Photos 0.5.0
+Die Screenshots zeigen den tatsächlichen Windows-Build von PAF-Photos 0.6.0
 unter Wine. Darstellung, Vorschaubilder und Bedienelemente stammen aus der App.
 
 Die gezeigten Bilddateien sind ausschließlich Demonstrationsmaterial; sie sind
@@ -18,4 +18,4 @@ nicht im App-Download enthalten.
   Das Foto erscheint als skalierte Vorschau in der Galerie.
 - **Abendlicht**: eigens für dieses Projekt erstellte Testillustration, MIT-Lizenz.
 
-PAF-Photos 0.5.0 uses an original generated cyan/violet aperture-P logo (`assets/logo.png`), licensed with this project under MIT. It is not a Microsoft Photos icon.
+PAF-Photos 0.6.0 uses an original generated cyan/violet aperture-P logo (`assets/logo.png`), licensed with this project under MIT. It is not a Microsoft Photos icon.

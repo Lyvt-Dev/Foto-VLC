@@ -1,14 +1,14 @@
-PAF-Photos 0.5.0 replaces the previous Photo VLC branding and makes saving and updates easier.
+PAF-Photos 0.6.0 improves button rendering and scrolling throughout the gallery and settings.
 
-- PAF-Photos branding throughout the app, executable, installer, shortcuts and Windows metadata. The original aperture-P logo remains. Existing installation and settings migrate.
-- Fixed white button backgrounds during scrolling: controls repaint their complete surface, and layout changes redraw the parent and children together.
-- Conversion now asks for the output format first, defaults to the original folder and keeps a confirmation with the full saved path, Open copy and Show in folder. PNG, JPEG, BMP, TIFF and lossless WebP are encoded in the background.
-- Automatic updates for installed apps: checks on startup and daily, bounded HTTPS downloads, version and SHA256 verification, installation after exit, and an optional Install now action. Updates can be disabled. Portable builds offer the release download.
+- Subtle raised button faces with an outer shadow and upper rim replace the recessed settings buttons. Rounded keyboard-focus outlines follow the chosen radius; complete background fills prevent visible rectangular corners at fractional DPI sizes.
+- Pixel-based scrolling replaces gallery row jumps and abrupt settings movement. A time-based, damped movement preserves momentum on repeated wheel input and settles gently. Small touchpad deltas, Windows scroll-line/page preferences and reduced-motion settings are respected.
+- Partial cards and their native buttons remain visible at viewport edges. The scrollbar uses the actual content range and dragging stops pending movement immediately.
+- Drawing buffers and fonts are reused, only visible settings are drawn, and scrolling invalidates the content area. Native child surfaces are composed together to reduce tearing.
 
-**Install setup.exe once to move from 0.4.0:** previous versions have no updater. Installation is per user, needs no admin account, retains your settings and leaves default photo associations unchanged.
+Download **setup.exe** for a per-user installation with codecs. Existing PAF-Photos 0.5.0 installations can receive this release automatically; use Settings → Check for updates → Install now, or close the app after the update finishes downloading. Settings and originals are preserved. Versions before 0.5.0 need the setup once.
 
-The full **PAFPhotos-Windows-x64.zip** includes the codecs and update helper. Extract the complete ZIP; keep codecs beside PAFPhotos.exe. The individual EXE supports fewer formats. Builds are currently unsigned.
+**PAFPhotos-Windows-x64.zip** is the portable alternative; extract the complete ZIP. The standalone EXE includes fewer decoders. Builds are currently unsigned.
 
-Windows rendering, five-format conversion, actual codec pixels and thumbnails, install/uninstall, updater checksum rejection and installation checks accompany this release. After publication, a Windows test checks the actual HTTPS manifest and setup download. Recognized extensions do not guarantee decoding every proprietary format; see the format guide. Animation and multipage viewing show the first frame/page; conversion exports the displayed raster without project layers or source metadata.
+Validation includes Windows controls and pixels at 100/150/200 percent DPI, partial viewport clipping, precision wheel input, reduced motion, scrollbar bounds, drawing-resource reuse, five actual conversion encoders, codec images, installer migration and updater verification. Portable motion tests compare behavior across different frame intervals. The Windows report records rendering time on the test machine; display smoothness also depends on hardware and Windows scheduling.
 
-The optional PAFPhotos-Codec-Sources.zip contains corresponding codec sources and licenses and is not needed to run the app.
+The format guide lists decoding limits. The optional PAFPhotos-Codec-Sources.zip contains corresponding codec sources and licenses and is not required to run the app.

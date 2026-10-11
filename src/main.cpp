@@ -1,6 +1,7 @@
 #include "image.hpp"
 #include "export.hpp"
 #include "updater.hpp"
+#include "motion.hpp"
 #include <commdlg.h>
 #include "core.hpp"
 #include "layout.hpp"
@@ -25,6 +26,7 @@
 #include <map>
 #include <set>
 #include <cmath>
+#include <chrono>
 using namespace Gdiplus;
 constexpr UINT Done=WM_APP+1,ThumbDone=WM_APP+2,ExportDone=WM_APP+3,UpdateDone=WM_APP+4;
 constexpr wchar_t AppClass[]=L"PAFPhotos.Main";
@@ -39,11 +41,21 @@ enum Action {
     Search=60,CloseExport,OpenSaved,GalleryBase=1000,RecentBase=100,ThumbBase=200
 };
 enum class Icon {None,Image,Folder,Left,Right,Fit,Actual,Minus,Plus,Rotate,Full,Info,Strip,Play,Pause,More,Home,Close,Help,External,Copy,Menu,Heart,Settings,Search,Sort,Grid,Check,Computer,Window,Mirror,Convert};
+struct RenderBuffer {
+    HDC dc=nullptr;HBITMAP bitmap=nullptr;HGDIOBJ previous=nullptr;int width=0,height=0;
+    RenderBuffer()=default;RenderBuffer(const RenderBuffer&)=delete;RenderBuffer& operator=(const RenderBuffer&)=delete;
+    ~RenderBuffer(){reset();}
+    void reset(){if(dc){if(previous)SelectObject(dc,previous);if(bitmap)DeleteObject(bitmap);DeleteDC(dc);}dc=nullptr;bitmap=nullptr;previous=nullptr;width=height=0;}
+    HDC prepare(HDC source,int w,int h){if(dc&&width==w&&height==h)return dc;reset();if(w<=0||h<=0)return nullptr;
+        dc=CreateCompatibleDC(source);if(!dc)return nullptr;bitmap=CreateCompatibleBitmap(source,w,h);if(!bitmap){reset();return nullptr;}
+        previous=SelectObject(dc,bitmap);width=w;height=h;return dc;}
+};
 struct Control {
     HWND window=nullptr;
     int id=0;
     foto::Box box;
-    std::wstring caption,tip;
+    std::wstring caption,tip,accessible;
+    RenderBuffer buffer;RECT pixelBounds{},clipBounds{};bool clipped=false,wantsClip=false;
     Icon icon=Icon::None;
     bool visible=false,enabled=true,active=false,primary=false;
     float hoverProgress=0;
@@ -148,7 +160,9 @@ struct App {
     HWND window=nullptr,tooltip=nullptr,search=nullptr;
     HFONT searchFont=nullptr;
     bool gallery=true,favoritesView=false,settings=false,navExpanded=false,selectMode=false,reverseSort=false;
-    int galleryScroll=0,galleryMaxScroll=0,settingsScroll=0,tileSize=210;
+    paf::ScrollMotion galleryScroll,settingsScroll;
+    double galleryMaxScroll=0;int tileSize=210;
+    std::chrono::steady_clock::time_point motionTime{};bool scrollAnimating=false;float scrollGrab=0;RenderBuffer buffer;
     bool scrollDragging=false;
     std::vector<fs::path> library,filtered;
     std::set<fs::path> selected;
@@ -201,7 +215,7 @@ struct App {
         for(const auto& path:library){if(favoritesView&&std::find(preferences.favorites.begin(),preferences.favorites.end(),path)==preferences.favorites.end())continue;
             auto name=path.filename().wstring();CharLowerBuffW(name.data(),DWORD(name.size()));if(needle.empty()||name.find(needle)!=std::wstring::npos)filtered.push_back(path);}
         if(reverseSort)std::reverse(filtered.begin(),filtered.end());
-        galleryScroll=0;
+        galleryScroll.reset();
         for(auto it=selected.begin();it!=selected.end();)if(std::find(filtered.begin(),filtered.end(),*it)==filtered.end())it=selected.erase(it);else ++it;
     }
     void rebuildLibrary() {
@@ -357,12 +371,18 @@ void round(Graphics& g,Color color,foto::Box r,float radius=-1) {
     path.AddArc(r.x+r.w-d,r.y+r.h-d,d,d,0,90);path.AddArc(r.x,r.y+r.h-d,d,d,90,90);path.CloseFigure();
     SolidBrush brush(color);g.FillPath(&brush,&path);
 }
+std::map<std::pair<float,bool>,std::unique_ptr<Font>> fonts;
+void outline(Graphics& g,Color color,foto::Box r,float radius=-1,float width=1){
+    if(radius<0)radius=float(app.preferences.radius);GraphicsPath path;float d=std::min(radius*2,std::min(r.w,r.h));
+    if(d<=0)path.AddRectangle(RectF(r.x,r.y,r.w,r.h));else{path.AddArc(r.x,r.y,d,d,180,90);path.AddArc(r.x+r.w-d,r.y,d,d,270,90);path.AddArc(r.x+r.w-d,r.y+r.h-d,d,d,0,90);path.AddArc(r.x,r.y+r.h-d,d,d,90,90);path.CloseFigure();}
+    Pen pen(color,width);g.DrawPath(&pen,&path);
+}
 void label(Graphics& g,const std::wstring& textValue,foto::Box r,float size=13,Color color=text,bool bold=false,bool center=false,bool wrap=false) {
-    FontFamily family(L"Segoe UI");Font font(family.GetLastStatus()==Ok?&family:FontFamily::GenericSansSerif(),size,bold?FontStyleBold:FontStyleRegular,UnitPixel);
+    auto& font=fonts[{size,bold}];if(!font){FontFamily family(L"Segoe UI");font=std::make_unique<Font>(family.GetLastStatus()==Ok?&family:FontFamily::GenericSansSerif(),size,bold?FontStyleBold:FontStyleRegular,UnitPixel);}
     SolidBrush brush(color);StringFormat format;format.SetTrimming(StringTrimmingEllipsisCharacter);
     format.SetLineAlignment(StringAlignmentCenter);if(!wrap)format.SetFormatFlags(StringFormatFlagsNoWrap);
     if(center)format.SetAlignment(StringAlignmentCenter);
-    g.DrawString(textValue.c_str(),-1,&font,RectF(r.x,r.y,r.w,r.h),&format,&brush);
+    g.DrawString(textValue.c_str(),-1,font.get(),RectF(r.x,r.y,r.w,r.h),&format,&brush);
 }
 void icon(Graphics& g,Icon type,float x,float y,Color color=text,float size=20) {
     auto state=g.Save();g.TranslateTransform(x,y);g.ScaleTransform(size/24,size/24);
@@ -405,7 +425,7 @@ void icon(Graphics& g,Icon type,float x,float y,Color color=text,float size=20) 
 }
 Com<IStream> brandStream;
 std::unique_ptr<Bitmap> brandBitmap;
-void releaseBrand(){brandBitmap.reset();brandStream.out();}
+void releaseBrand(){fonts.clear();brandBitmap.reset();brandStream.out();}
 void brand(Graphics& g,float x,float y,float size=28) {
     if(!brandBitmap){auto module=GetModuleHandleW(nullptr);auto resource=FindResourceW(module,MAKEINTRESOURCEW(10),RT_RCDATA);
         if(resource){auto data=LoadResource(module,resource);brandStream.p=SHCreateMemStream(static_cast<const BYTE*>(LockResource(data)),SizeofResource(module,resource));
@@ -414,7 +434,7 @@ void brand(Graphics& g,float x,float y,float size=28) {
 }
 void drawPicture(Graphics& g,const Picture& p,foto::Box box,bool crop=false) {
     float scale=crop?std::max(box.w/p.width,box.h/p.height):std::min(box.w/p.width,box.h/p.height);
-    float w=p.width*scale,h=p.height*scale;auto saved=g.Save();g.SetClip(RectF(box.x,box.y,box.w,box.h));
+    float w=p.width*scale,h=p.height*scale;auto saved=g.Save();g.SetClip(RectF(box.x,box.y,box.w,box.h),CombineModeIntersect);
     Bitmap bitmap(p.width,p.height,p.width*4,PixelFormat32bppPARGB,const_cast<BYTE*>(p.pixels.data()));
     g.SetInterpolationMode(InterpolationModeHighQualityBicubic);g.DrawImage(&bitmap,RectF(box.x+(box.w-w)/2,box.y+(box.h-h)/2,w,h));g.Restore(saved);
 }
@@ -464,6 +484,7 @@ Color blend(Color from,Color to,float progress){return Color(255,BYTE(from.GetR(
 LRESULT CALLBACK buttonProc(HWND window,UINT msg,WPARAM wp,LPARAM lp,UINT_PTR,DWORD_PTR id) {
     switch(msg) {
     case WM_ERASEBKGND:return 1;
+    case WM_MOUSEWHEEL:return SendMessageW(app.window,msg,wp,lp);
     case WM_PAINT:case WM_PRINTCLIENT:{
         PAINTSTRUCT paint{};HDC dc=msg==WM_PAINT?BeginPaint(window,&paint):reinterpret_cast<HDC>(wp);
         RECT bounds{};GetClientRect(window,&bounds);DRAWITEMSTRUCT item{};item.CtlType=ODT_BUTTON;item.CtlID=UINT(id);item.hwndItem=window;item.hDC=dc;item.rcItem=bounds;item.itemAction=ODA_DRAWENTIRE;
@@ -480,7 +501,7 @@ LRESULT CALLBACK buttonProc(HWND window,UINT msg,WPARAM wp,LPARAM lp,UINT_PTR,DW
         if(wp==VK_RETURN){command(int(id));return 0;}
         if(wp!=VK_SPACE&&shortcut(UINT(wp)))return 0;
         break;
-    case WM_NCDESTROY:RemoveWindowSubclass(window,buttonProc,id);break;
+    case WM_NCDESTROY:if(app.controls.count(int(id)))app.controls[int(id)].buffer.reset();RemoveWindowSubclass(window,buttonProc,id);break;
     }
     return DefSubclassProc(window,msg,wp,lp);
 }
@@ -492,16 +513,23 @@ void place(int id,foto::Box box,const std::wstring& caption,Icon icon=Icon::None
         TOOLINFOW tool{};tool.cbSize=sizeof(tool);tool.uFlags=TTF_IDISHWND|TTF_SUBCLASS;tool.hwnd=app.window;tool.uId=reinterpret_cast<UINT_PTR>(c.window);
         c.tip=tip.empty()?caption:tip;tool.lpszText=c.tip.data();SendMessageW(app.tooltip,TTM_ADDTOOLW,0,reinterpret_cast<LPARAM>(&tool));
     }
-    if(c.caption!=caption){c.caption=caption;SetWindowTextW(c.window,caption.c_str());}
+    if(c.caption!=caption){c.caption=caption;c.accessible=caption;SetWindowTextW(c.window,caption.c_str());}
     auto wantedTip=tip.empty()?caption:tip;
     if(c.tip!=wantedTip) {
         c.tip=wantedTip;TOOLINFOW tool{};tool.cbSize=sizeof(tool);tool.uFlags=TTF_IDISHWND|TTF_SUBCLASS;tool.hwnd=app.window;tool.uId=reinterpret_cast<UINT_PTR>(c.window);tool.lpszText=c.tip.data();
         SendMessageW(app.tooltip,TTM_UPDATETIPTEXTW,0,reinterpret_cast<LPARAM>(&tool));
     }
     float scale=app.dpi/96.0f;
-    SetWindowPos(c.window,nullptr,int(std::round(box.x*scale)),int(std::round(box.y*scale)),int(std::round(box.w*scale)),int(std::round(box.h*scale)),SWP_NOZORDER|SWP_NOACTIVATE|SWP_NOREDRAW);
+    RECT pixels{int(std::round(box.x*scale)),int(std::round(box.y*scale)),int(std::round(box.w*scale)),int(std::round(box.h*scale))};
+    if(!EqualRect(&pixels,&c.pixelBounds)){SetWindowPos(c.window,nullptr,pixels.left,pixels.top,pixels.right,pixels.bottom,SWP_NOZORDER|SWP_NOACTIVATE|SWP_NOREDRAW);c.pixelBounds=pixels;}
     if(bool(IsWindowEnabled(c.window))!=enabled)EnableWindow(c.window,enabled);
     if(!(GetWindowLongW(c.window,GWL_STYLE)&WS_VISIBLE))ShowWindow(c.window,SW_SHOWNA);
+}
+void clipControl(int id,foto::Box viewport){
+    auto& c=app.controls[id];c.wantsClip=true;float scale=app.dpi/96.0f;
+    RECT clip{std::max(0L,int(std::ceil(viewport.x*scale))-c.pixelBounds.left),std::max(0L,int(std::ceil(viewport.y*scale))-c.pixelBounds.top),
+        std::min(c.pixelBounds.right,int(std::floor((viewport.x+viewport.w)*scale))-c.pixelBounds.left),std::min(c.pixelBounds.bottom,int(std::floor((viewport.y+viewport.h)*scale))-c.pixelBounds.top)};
+    if(!c.clipped||!EqualRect(&clip,&c.clipBounds)){HRGN region=CreateRectRgn(clip.left,clip.top,clip.right,clip.bottom);if(!SetWindowRgn(c.window,region,FALSE))DeleteObject(region);c.clipBounds=clip;c.clipped=true;}
 }
 void scheduleThumbnails(size_t first,size_t count) {
     bool queued=false;
@@ -525,7 +553,7 @@ void layoutSettingsControls();
 void layoutShell();
 void layoutControls() {
     if(!app.window)return;
-    for(auto& entry:app.controls)entry.second.visible=false;
+    for(auto& entry:app.controls){entry.second.visible=false;entry.second.wantsClip=false;}
     auto l=viewLayout();float w=l.width;bool file=!app.gallery&&!app.settings&&!app.files.empty(),viewer=file&&app.helpPage<0,loaded=bool(app.picture)&&!app.busy;
     layoutShell();
     if(app.helpPage>=0) {
@@ -586,7 +614,7 @@ void layoutControls() {
             scheduleThumbnails(range.first,range.second);
         }
     }
-    for(auto& entry:app.controls)if(!entry.second.visible&&entry.second.window)ShowWindow(entry.second.window,SW_HIDE);
+    for(auto& entry:app.controls){auto& c=entry.second;if(!c.visible&&c.window&&(GetWindowLongW(c.window,GWL_STYLE)&WS_VISIBLE))ShowWindow(c.window,SW_HIDE);if(c.visible&&c.clipped&&!c.wantsClip){SetWindowRgn(c.window,nullptr,FALSE);c.clipped=false;}}
     (void)viewer;
 }
 void refresh() {
@@ -597,7 +625,7 @@ void refresh() {
 void drawButton(const DRAWITEMSTRUCT& item) {
     auto it=app.controls.find(int(item.CtlID));if(it==app.controls.end())return;
     auto& c=it->second;float scale=app.dpi/96.0f,w=c.box.w,h=c.box.h;
-    HDC memory=CreateCompatibleDC(item.hDC);HBITMAP bitmap=CreateCompatibleBitmap(item.hDC,item.rcItem.right,item.rcItem.bottom);auto previous=SelectObject(memory,bitmap);
+    HDC memory=c.buffer.prepare(item.hDC,item.rcItem.right,item.rcItem.bottom);if(!memory)memory=item.hDC;
     {Graphics g(memory);g.ScaleTransform(scale,scale);g.SetSmoothingMode(SmoothingModeAntiAlias);g.SetTextRenderingHint(TextRenderingHintClearTypeGridFit);
     Color parent=ui::background;
     if(c.box.y<64 || c.id==NavToggle || c.id==Gallery || c.id==Favorites || c.id==Settings || c.id==ImportFolder||((c.id==OpenFolder||c.id==About)&&shellNavigation()))parent=ui::surface;
@@ -608,12 +636,12 @@ void drawButton(const DRAWITEMSTRUCT& item) {
     ui::fill(g,parent,{0,0,w,h});
     bool setting=app.settings&&(c.id==Theme||c.id==Language||c.id==DefaultZoom||c.id==TileInfo||c.id==Strip||c.id==RemoveFolder||c.id==ClearRecent||c.id==ReleasePage||(c.id>=Accent&&c.id<=CheckUpdates));
     if(setting)parent=ui::raised;
-    ui::fill(g,parent,{0,0,w,h});
+    g.Clear(parent);
     bool hot=app.hover==c.id,pressed=(item.itemState&ODS_SELECTED)!=0,focused=(item.itemState&ODS_FOCUS)!=0;
     Color fg=c.enabled?ui::text:ui::faint;
     Color fill=pressed?ui::line:blend(parent,ui::raised,c.hoverProgress);
     if(c.id==Open||c.id==SelectMode||c.id==ImportFolder)fill=blend(ui::raised,ui::line,c.hoverProgress);
-    if(setting)fill=pressed?ui::line:blend(ui::surface,ui::line,c.hoverProgress);
+    if(setting)fill=blend(ui::raised,ui::text,0.055f+c.hoverProgress*0.035f);
     if(c.active){fill=pressed?ui::line:blend(ui::raised,ui::line,c.hoverProgress);fg=ui::text;}
     if(c.id==Exit&&hot){fill=Color(255,196,43,28);fg=Color(255,255,255,255);}
     if(c.primary){fill=blend(ui::accent,ui::line,pressed?0.35f:c.hoverProgress*0.15f);fg=(int(fill.GetR())*299+int(fill.GetG())*587+int(fill.GetB())*114)>140000?Color(255,0,0,0):Color(255,255,255,255);}
@@ -646,8 +674,12 @@ void drawButton(const DRAWITEMSTRUCT& item) {
         ui::round(g,on?ui::accent:ui::line,{50,(h-24)/2,52,24},12);
         ui::round(g,on?Color(255,20,20,20):ui::muted,{on?80.0f:54.0f,(h-16)/2,16,16},8);
     }else {
-        ui::round(g,fill,{0,0,w,h});
-
+        bool elevated=setting||c.primary||c.active||c.id==Open||c.id==SelectMode||c.id==ImportFolder||c.id==WelcomeOpen||c.id==WelcomeFolder;
+        foto::Box face=elevated?foto::Box{2,pressed?2.0f:1.0f,w-4,h-4}:foto::Box{0,0,w,h};
+        if(elevated){ui::round(g,Color(pressed?25:55,0,0,0),{1,3,w-2,h-3});if(!setting&&!c.primary)fill=blend(fill,ui::text,0.035f);}
+        ui::round(g,fill,face);
+        if(elevated){ui::outline(g,blend(fill,ui::text,0.10f),{face.x+0.5f,face.y+0.5f,face.w-1,face.h-1});auto rim=g.Save();g.SetClip(RectF(face.x,face.y,face.w,face.h/2),CombineModeIntersect);ui::outline(g,blend(fill,ui::text,0.18f),{face.x+0.5f,face.y+0.5f,face.w-1,face.h-1});g.Restore(rim);}
+        if(pressed)g.TranslateTransform(0,1);
         if(c.id==Accent){ui::round(g,ui::accent,{12,(h-18)/2,18,18},9);ui::label(g,c.caption,{40,0,w-48,h},14,fg);}
         else {
         bool iconOnly=c.icon!=Icon::None&&w<=48;
@@ -661,8 +693,8 @@ void drawButton(const DRAWITEMSTRUCT& item) {
         }
     }
     if((c.id==Gallery&&app.gallery&&!app.favoritesView&&!app.settings)||(c.id==Favorites&&app.favoritesView&&!app.settings))ui::round(g,ui::accent,{0,9,3,h-18},1.5f);
-    if(focused) {Pen focus(ui::accent,1.5f);g.DrawRectangle(&focus,2.0f,2.0f,w-4,h-4);}
-    }BitBlt(item.hDC,0,0,item.rcItem.right,item.rcItem.bottom,memory,0,0,SRCCOPY);SelectObject(memory,previous);DeleteObject(bitmap);DeleteDC(memory);
+    if(focused)ui::outline(g,ui::accent,{2.5f,2.5f,w-5,h-5},-1,1.5f);
+    }if(memory!=item.hDC)BitBlt(item.hDC,0,0,item.rcItem.right,item.rcItem.bottom,memory,0,0,SRCCOPY);
 }
 void drawWelcome(Graphics& g,const foto::ViewerLayout& l) {
     float x=std::max(40.0f,(l.width-850)/2),y=std::max(132.0f,(l.height-370)/2);
@@ -780,15 +812,15 @@ void drawShell(Graphics&,const foto::ViewerLayout&);
 void paint(HWND window) {
     PAINTSTRUCT ps;HDC dc=BeginPaint(window,&ps);RECT bounds{};GetClientRect(window,&bounds);
     if(bounds.right<=0||bounds.bottom<=0){EndPaint(window,&ps);return;}
-    HDC memory=CreateCompatibleDC(dc);HBITMAP buffer=CreateCompatibleBitmap(dc,bounds.right,bounds.bottom);auto previous=SelectObject(memory,buffer);
+    HDC memory=app.buffer.prepare(dc,bounds.right,bounds.bottom);if(!memory)memory=dc;
     {
         Graphics g(memory);float scale=app.dpi/96.0f;g.ScaleTransform(scale,scale);g.SetSmoothingMode(SmoothingModeAntiAlias);g.SetTextRenderingHint(TextRenderingHintClearTypeGridFit);
-        auto l=viewLayout();float w=l.width,h=l.height;ui::fill(g,ui::background,{0,0,w,h});ui::fill(g,ui::surface,{0,0,w,64});
-        drawShell(g,l);
+        auto l=viewLayout();float w=l.width,h=l.height;g.SetClip(RectF(ps.rcPaint.left/scale,ps.rcPaint.top/scale,(ps.rcPaint.right-ps.rcPaint.left)/scale,(ps.rcPaint.bottom-ps.rcPaint.top)/scale));bool contentOnly=ps.rcPaint.top>=170*scale&&ps.rcPaint.bottom<=(h-28)*scale;ui::fill(g,ui::background,{0,0,w,h});ui::fill(g,ui::surface,{0,0,w,64});
+        if(!contentOnly)drawShell(g,l);
         if(app.helpPage>=0)drawHelp(g,l);else if(app.settings)drawSettings(g,l);else if(app.gallery||app.files.empty())drawGallery(g,l);else {drawViewer(g,l);if(app.exportNotice){auto panel=exportNoticeBox();ui::round(g,ui::surface,panel);ui::icon(g,Icon::Check,panel.x+18,panel.y+15,ui::accent,22);
             ui::label(g,tr(L"Kopie gespeichert"),{panel.x+50,panel.y+10,panel.w-94,30},16,ui::text,true);
             ui::label(g,app.lastExport.wstring(),{panel.x+18,panel.y+42,panel.w-36,34},12,ui::muted,false,false,true);}}
-        ui::fill(g,ui::line,{0,h-28,w,1});
+        if(!contentOnly){ui::fill(g,ui::line,{0,h-28,w,1});
         std::wstring status=tr(L"Bereit");
         if(!app.gallery&&!app.settings&&!app.files.empty()&&app.helpPage<0) {
             status=std::to_wstring(app.index+1)+L" / "+std::to_wstring(app.files.size());
@@ -796,9 +828,9 @@ void paint(HWND window) {
             if(app.slideshow)status+=tr(L"   ·   Diashow läuft");
         }
         ui::label(g,app.exporting?tr(L"Bild wird konvertiert …"):app.notice.empty()?status:app.notice,{20,h-27,w-295,26},10,app.notice.empty()?ui::muted:ui::accent);
-        ui::label(g,std::wstring(L"PAF-Photos " FOTO_VERSION_WSTRING)+tr(L"   ·   F1 Hilfe"),{w-230,h-27,210,26},10,ui::faint,false,true);
+        ui::label(g,std::wstring(L"PAF-Photos " FOTO_VERSION_WSTRING)+tr(L"   ·   F1 Hilfe"),{w-230,h-27,210,26},10,ui::faint,false,true);}
     }
-    BitBlt(dc,0,0,bounds.right,bounds.bottom,memory,0,0,SRCCOPY);SelectObject(memory,previous);DeleteObject(buffer);DeleteDC(memory);EndPaint(window,&ps);
+    if(memory!=dc)BitBlt(dc,0,0,bounds.right,bounds.bottom,memory,0,0,SRCCOPY);EndPaint(window,&ps);
 }
 float sidebarWidth(){return app.navExpanded?236.0f:64.0f;}
 float contentLeft(){return sidebarWidth()+48;}
@@ -852,20 +884,43 @@ void layoutGalleryControls(){
     float gridTop=top+44,usable=std::max(180.0f,w);int columns=std::max(1,int((usable+12)/(app.tileSize+12)));
     float tile=(usable-float(columns-1)*12)/columns,height=tile*0.76f+(app.preferences.tileInfo?40:0);
     int rows=int((app.filtered.size()+columns-1)/columns);
-    int visibleRows=std::max(1,int((l.height-gridTop-36)/(height+12)));
-    int maxScroll=std::max(0,rows-visibleRows);app.galleryMaxScroll=maxScroll;app.galleryScroll=std::clamp(app.galleryScroll,0,maxScroll);
-    size_t start=size_t(app.galleryScroll)*columns;float offset=0;
+    double viewportHeight=std::max(1.0f,l.height-gridTop-36),stride=height+12;
+    app.galleryMaxScroll=std::max(0.0,rows*stride-12-viewportHeight);app.galleryScroll.constrain(app.galleryMaxScroll);
+    size_t firstRow=size_t(app.galleryScroll.position/stride),start=firstRow*columns;
     bool queued=false;int control=0;
     for(size_t i=start;i<app.filtered.size()&&control<90;++i){
-        float y=gridTop+float((i-start)/columns)*(height+12)-offset;
-        if(y+height>l.height-36)break;
-        int id=GalleryBase+control++;place(id,{x+float((i-start)%columns)*(tile+12),y,tile,height},app.filtered[i].filename().wstring(),Icon::Image,true,app.selected.count(app.filtered[i])!=0,false,app.filtered[i].wstring());app.controls[id].item=i;
+        float y=gridTop+float(i/columns)*float(stride)-float(app.galleryScroll.position);
+        if(y>=l.height-36)break;
+        int id=GalleryBase+control++;place(id,{x+float(i%columns)*(tile+12),y,tile,height},app.filtered[i].filename().wstring(),Icon::Image,true,app.selected.count(app.filtered[i])!=0,false,app.filtered[i].wstring());app.controls[id].item=i;
+        clipControl(id,{x,gridTop,w,float(viewportHeight)});
         if(!app.requestedThumbs.count(app.filtered[i])){app.requestedThumbs.insert(app.filtered[i]);std::lock_guard<std::mutex> lock(app.mutex);app.thumbQueue.push_back({app.filtered[i],app.folderSerial});queued=true;}
     }
     if(queued)app.cv.notify_one();
     if(app.thumbs.size()>128){std::set<fs::path> visible;for(const auto& c:app.controls)if(c.first>=GalleryBase&&c.second.visible)visible.insert(app.filtered[c.second.item]);
         for(auto i=app.thumbs.begin();i!=app.thumbs.end()&&app.thumbs.size()>96;){if(!visible.count(i->first)){app.requestedThumbs.erase(i->first);i=app.thumbs.erase(i);}else ++i;}}
 }
+struct ScrollTrack{float top=0,height=0,thumb=0,position=0;double maximum=0;};
+ScrollTrack scrollTrack(){auto l=viewLayout();ScrollTrack t;t.top=app.settings?170.0f:196.0f+(app.selectMode?66.0f:0.0f);t.height=std::max(1.0f,l.height-36-t.top);
+    t.maximum=app.settings?std::max(0.0,1810.0-(l.height-36)):app.galleryMaxScroll;
+    t.thumb=std::min(t.height,std::max(28.0f,float(t.height*t.height/(t.height+t.maximum))));
+    double position=app.settings?app.settingsScroll.position:app.galleryScroll.position;
+    t.position=t.top+(t.maximum>0?float(position/t.maximum)*(t.height-t.thumb):0);return t;}
+void redrawScroll(){layoutControls();auto l=viewLayout();float scale=app.dpi/96.0f;RECT dirty{LONG(contentLeft()*scale),LONG((app.settings?170:196+(app.selectMode?66:0))*scale),LONG(l.width*scale),LONG((l.height-36)*scale)};
+    RedrawWindow(app.window,&dirty,nullptr,RDW_INVALIDATE|RDW_NOERASE|RDW_ALLCHILDREN|RDW_UPDATENOW);}
+bool scrollFrame(double seconds){
+    if(app.helpPage>=0||(!app.settings&&!app.gallery))return false;
+    auto& motion=app.settings?app.settingsScroll:app.galleryScroll;
+    bool active=false;if(motionEnabled())active=motion.advance(seconds);else motion.reset(motion.target);
+    motion.constrain(scrollTrack().maximum);redrawScroll();return active;
+}
+void scrollWheel(short delta){if(!delta)return;auto track=scrollTrack();UINT lines=3;SystemParametersInfoW(SPI_GETWHEELSCROLLLINES,0,&lines,0);
+    double distance=lines==WHEEL_PAGESCROLL?track.height*0.9:double(lines)*30;
+    auto& motion=app.settings?app.settingsScroll:app.galleryScroll;motion.add(-double(delta)/WHEEL_DELTA*distance,track.maximum);
+    if(!motionEnabled()){motion.reset(motion.target);redrawScroll();return;}
+    if(!app.scrollAnimating){app.motionTime=std::chrono::steady_clock::now();app.scrollAnimating=true;SetTimer(app.window,6,16,nullptr);}
+}
+void scrollDrag(float y){auto track=scrollTrack();double fraction=track.height>track.thumb?std::clamp(double(y-track.top-app.scrollGrab)/(track.height-track.thumb),0.0,1.0):0;
+    (app.settings?app.settingsScroll:app.galleryScroll).reset(fraction*track.maximum);redrawScroll();}
 struct SettingRow{float y;const wchar_t* title;const wchar_t* description;Icon icon;int action;};
 std::vector<SettingRow> settingsRows(){return {
     {202,tr(L"App-Design"),tr(L"Wähle das Erscheinungsbild von PAF-Photos."),Icon::Settings,Theme},
@@ -873,7 +928,7 @@ std::vector<SettingRow> settingsRows(){return {
     {390,tr(L"Dateinamen in der Galerie"),tr(L"Zeige den Namen unter jedem Vorschaubild."),Icon::Grid,TileInfo},
     {484,tr(L"Akzentfarbe"),tr(L"Wähle eine eigene Farbe für aktive Elemente."),Icon::Settings,Accent},
     {578,tr(L"Eckenradius"),tr(L"Von kantig bis weich gerundet. Die Vorschau ist sofort sichtbar."),Icon::Grid,Radius},
-    {672,tr(L"Animationen"),tr(L"Sanfte Hover-Übergänge. Windows-Bewegungseinstellungen werden beachtet."),Icon::Play,Animations},
+    {672,tr(L"Animationen"),tr(L"Sanfte Hover- und Scroll-Bewegungen. Windows-Bewegungseinstellungen werden beachtet."),Icon::Play,Animations},
     {766,tr(L"JPEG-Qualität"),tr(L"Qualität beim Konvertieren. Transparenz wird bei JPEG weiß."),Icon::Image,Quality},
     {928,tr(L"Zoom-Voreinstellung"),tr(L"Wähle, wie Bilder beim Öffnen angezeigt werden."),Icon::Image,DefaultZoom},
     {1022,tr(L"Filmstreifen"),tr(L"Zeige weitere Bilder beim Betrachten eines Fotos."),Icon::Strip,Strip},
@@ -903,12 +958,13 @@ const wchar_t* settingValue(int id){
 }
 void layoutSettingsControls(){
     auto l=viewLayout();float x=contentLeft(),w=std::min(850.0f,l.width-x-42);
-    int maxScroll=std::max(0,int(1810-(l.height-36)));app.settingsScroll=std::clamp(app.settingsScroll,0,maxScroll);
+    int maxScroll=std::max(0,int(1810-(l.height-36)));app.settingsScroll.constrain(maxScroll);
     for(auto row:settingsRows()){
-        float y=row.y-app.settingsScroll;if(y<170||y+88>l.height-36)continue;
+        float y=row.y-float(app.settingsScroll.position);if(y+64<=170||y+24>=l.height-36)continue;
         float controlWidth=row.action==DefaultZoom?190:row.action==TileInfo||row.action==Strip||row.action==Animations||row.action==Recursive||row.action==AutoUpdates?112:170;
         place(row.action,{x+w-controlWidth-20,y+24,controlWidth,40},settingValue(row.action),Icon::None,row.action!=RemoveFolder||!app.preferences.folders.empty());
-        SetWindowTextW(app.controls[row.action].window,(std::wstring(row.title)+L": "+settingValue(row.action)).c_str());
+        clipControl(row.action,{x,170,w,l.height-206});
+        auto& c=app.controls[row.action];auto accessible=std::wstring(row.title)+L": "+settingValue(row.action);if(c.accessible!=accessible){c.accessible=accessible;SetWindowTextW(c.window,accessible.c_str());}
     }
 }
 void drawShell(Graphics& g,const foto::ViewerLayout& l){
@@ -927,7 +983,7 @@ void drawGallery(Graphics& g,const foto::ViewerLayout& l){
     auto count=std::to_wstring(app.filtered.size())+L" "+tr(L"Elemente");
     if(app.selectMode)count+=L" · "+std::to_wstring(app.selected.size())+L" "+tr(L"ausgewählt");
     ui::label(g,count,{x,151,w,26},16,ui::muted);
-    if(app.galleryMaxScroll>0&&!app.filtered.empty()){float track=l.height-240,thumb=std::max(30.0f,track/(app.galleryMaxScroll+1));ui::round(g,ui::faint,{l.width-10,202+float(app.galleryScroll)/app.galleryMaxScroll*(track-thumb),3,thumb},1.5f);}
+    if(app.galleryMaxScroll>0&&!app.filtered.empty()){auto t=scrollTrack();ui::round(g,ui::faint,{l.width-10,t.position,3,t.thumb},1.5f);}
     if(app.filtered.empty()){
         float y=std::max(320.0f,l.height/2);ui::brand(g,x+w/2-36,y-96,72);
         ui::label(g,app.library.empty()?tr(L"Los geht’s mit PAF-Photos"):app.favoritesView?tr(L"Noch keine Favoriten"):tr(L"Keine passenden Bilder"),{x,y,w,46},30,ui::text,false,true);
@@ -937,16 +993,16 @@ void drawGallery(Graphics& g,const foto::ViewerLayout& l){
 void drawSettings(Graphics& g,const foto::ViewerLayout& l){
     float x=contentLeft(),w=std::min(850.0f,l.width-x-42);ui::icon(g,Icon::Settings,x,112,ui::text,28);
     ui::label(g,tr(L"Einstellungen"),{x+42,96,w-42,48},30,ui::text,true);
-    auto saved=g.Save();g.SetClip(RectF(x,170,w,l.height-206));
+    auto saved=g.Save();g.SetClip(RectF(x,170,w,l.height-206),CombineModeIntersect);
     const std::pair<float,const wchar_t*> sections[]={{164,tr(L"Personalisierung")},{890,tr(L"Bildbetrachtung")},{1232,tr(L"Bibliothek & Datenschutz")},{1576,tr(L"Über die App")}};
-    for(const auto& section:sections)ui::label(g,section.second,{x,section.first-app.settingsScroll,w,30},18,ui::text,true);
+    for(const auto& section:sections){float y=section.first-float(app.settingsScroll.position);if(y+30>170&&y<l.height-36)ui::label(g,section.second,{x,y,w,30},18,ui::text,true);}
     for(auto row:settingsRows()){
-        float y=row.y-app.settingsScroll;ui::round(g,ui::raised,{x,y,w,88});ui::icon(g,row.icon,x+24,y+30,ui::text,26);
+        float y=row.y-float(app.settingsScroll.position);if(y+88<=170||y>=l.height-36)continue;ui::round(g,ui::raised,{x,y,w,88});ui::icon(g,row.icon,x+24,y+30,ui::text,26);
         ui::label(g,row.title,{x+74,y+14,w-290,30},17,ui::text);
         ui::label(g,row.description,{x+74,y+43,w-290,34},13,ui::muted,false,false,true);
     }
     g.Restore(saved);
-    if(1810>l.height-36){float track=l.height-214,thumb=std::max(40.0f,track*track/980);float maxScroll=float(std::max(1,int(1810-(l.height-36))));ui::round(g,ui::line,{l.width-10,176+float(app.settingsScroll)/maxScroll*(track-thumb),3,thumb},1.5f);}
+    if(1810>l.height-36){auto t=scrollTrack();ui::round(g,ui::line,{l.width-10,t.position,3,t.thumb},1.5f);}
 }
 
 void choose(bool folder,bool import=false) {
@@ -1071,7 +1127,7 @@ void command(int id) {
     case Home:case Gallery:case Favorites:
         if(app.slideshow)command(Slide);
         app.gallery=true;app.settings=false;app.favoritesView=id==Favorites;app.helpPage=-1;app.rebuildLibrary();SetWindowTextW(app.window,AppTitle);SetFocus(app.window);break;
-    case Settings:if(app.slideshow)command(Slide);app.settings=true;app.helpPage=-1;app.settingsScroll=0;SetFocus(app.window);break;
+    case Settings:if(app.slideshow)command(Slide);app.settings=true;app.helpPage=-1;app.settingsScroll.reset();SetFocus(app.window);break;
     case NavToggle:app.navExpanded=!app.navExpanded;break;
     case ImportFolder:choose(true,true);break;
     case SelectMode:app.selectMode=!app.selectMode;if(!app.selectMode)app.selected.clear();break;
@@ -1085,7 +1141,7 @@ void command(int id) {
     case Recursive:app.preferences.recursive=!app.preferences.recursive;app.rebuildLibrary();app.saveSettings();break;
     case TileInfo:app.preferences.tileInfo=!app.preferences.tileInfo;app.saveSettings();break;
     case Sort:app.reverseSort=!app.reverseSort;app.filterLibrary();break;
-    case GridSize:app.tileSize=app.tileSize==210?150:app.tileSize==150?280:210;app.galleryScroll=0;break;
+    case GridSize:app.tileSize=app.tileSize==210?150:app.tileSize==150?280:210;app.galleryScroll.reset();break;
     case Favorite:{std::vector<fs::path> paths;if(app.gallery)paths.assign(app.selected.begin(),app.selected.end());else if(!app.files.empty())paths.push_back(app.files[app.index]);
         for(const auto& path:paths){auto i=std::find(app.preferences.favorites.begin(),app.preferences.favorites.end(),path);if(i==app.preferences.favorites.end())app.preferences.favorites.push_back(path);else app.preferences.favorites.erase(i);}app.saveSettings();app.rebuildLibrary();break;}
     case Language:case Theme:case DefaultZoom:{HMENU menu=CreatePopupMenu();int base=id==Language?600:id==Theme?610:620;
@@ -1201,14 +1257,14 @@ LRESULT CALLBACK wndProc(HWND window,UINT message,WPARAM wp,LPARAM lp) {
     }
     case WM_LBUTTONDOWN: {
         if(shellNavigation()&&app.helpPage<0){auto l=viewLayout();float scale=app.dpi/96.0f,x=GET_X_LPARAM(lp)/scale,y=GET_Y_LPARAM(lp)/scale;
-            if(x>l.width-20&&y>176&&y<l.height-36){app.scrollDragging=true;SetCapture(window);int maximum=app.settings?std::max(0,int(1810-(l.height-36))):app.galleryMaxScroll;
-                int position=int(std::clamp((y-176)/(l.height-212),0.0f,1.0f)*maximum);if(app.settings)app.settingsScroll=position;else app.galleryScroll=position;refresh();return 0;}}
+            auto track=scrollTrack();if(x>l.width-20&&y>track.top&&y<track.top+track.height&&track.maximum>0){
+                app.scrollDragging=true;SetCapture(window);app.scrollGrab=y>=track.position&&y<=track.position+track.thumb?y-track.position:track.thumb/2;scrollDrag(y);return 0;}}
+
         SetFocus(window);POINT p{GET_X_LPARAM(lp),GET_Y_LPARAM(lp)};float scale=app.dpi/96.0f;auto r=viewLayout().image;
         if(app.picture&&!app.gallery&&!app.settings&&app.helpPage<0&&RectF(r.x,r.y,r.w,r.h).Contains(p.x/scale,p.y/scale)){app.dragging=true;app.drag=p;SetCapture(window);}return 0;
     }
     case WM_MOUSEMOVE:
-        if(app.scrollDragging){auto l=viewLayout();float y=GET_Y_LPARAM(lp)/(app.dpi/96.0f);int maximum=app.settings?std::max(0,int(1810-(l.height-36))):app.galleryMaxScroll;
-            int position=int(std::clamp((y-176)/(l.height-212),0.0f,1.0f)*maximum);if(app.settings)app.settingsScroll=position;else app.galleryScroll=position;refresh();return 0;}
+        if(app.scrollDragging){float y=GET_Y_LPARAM(lp)/(app.dpi/96.0f);scrollDrag(y);return 0;}
         if(app.dragging) {
             POINT p{GET_X_LPARAM(lp),GET_Y_LPARAM(lp)};double scale=app.dpi/96.0;
             app.panX+=(p.x-app.drag.x)/scale;app.panY+=(p.y-app.drag.y)/scale;app.drag=p;updateZoom();InvalidateRect(window,nullptr,FALSE);
@@ -1217,7 +1273,7 @@ LRESULT CALLBACK wndProc(HWND window,UINT message,WPARAM wp,LPARAM lp) {
     case WM_CAPTURECHANGED:app.scrollDragging=false;app.dragging=false;return 0;
     case WM_LBUTTONDBLCLK:if(app.picture&&!app.gallery&&!app.settings&&app.helpPage<0)command(app.fit?Actual:Fit);return 0;
     case WM_MOUSEWHEEL:
-        if(app.helpPage<0&&(app.gallery||app.settings)){int delta=GET_WHEEL_DELTA_WPARAM(wp)>0?-90:90;if(app.settings)app.settingsScroll=std::clamp(app.settingsScroll+delta,0,1810);else app.galleryScroll=std::max(0,app.galleryScroll+(delta>0?1:-1));refresh();return 0;}
+        if(app.helpPage<0&&(app.gallery||app.settings)){scrollWheel(GET_WHEEL_DELTA_WPARAM(wp));return 0;}
         if(app.picture&&!app.gallery&&!app.settings&&app.helpPage<0) {
             POINT p{GET_X_LPARAM(lp),GET_Y_LPARAM(lp)};ScreenToClient(window,&p);float scale=app.dpi/96.0f;
             auto r=viewLayout().image;
@@ -1225,6 +1281,8 @@ LRESULT CALLBACK wndProc(HWND window,UINT message,WPARAM wp,LPARAM lp) {
         }return 0;
     case WM_KEYDOWN:if(shortcut(UINT(wp)))return 0;break;
     case WM_TIMER:
+        if(wp==6){auto now=std::chrono::steady_clock::now();double elapsed=std::chrono::duration<double>(now-app.motionTime).count();app.motionTime=now;
+            if(!scrollFrame(elapsed)){KillTimer(window,6);app.scrollAnimating=false;}return 0;}
         if(wp==5&&app.preferences.autoUpdates)checkUpdates();
         if(wp==1&&!app.busy&&app.files.size()>1&&app.helpPage<0)command(Next);
         if(wp==2&&app.busy)InvalidateRect(window,nullptr,FALSE);
@@ -1241,7 +1299,7 @@ LRESULT CALLBACK wndProc(HWND window,UINT message,WPARAM wp,LPARAM lp) {
                 app.notice=tr(L"Update konnte nicht gestartet werden. Versuche es über Einstellungen erneut.");if(app.installUpdateNow){app.installUpdateNow=false;refresh();return 0;}}}
         app.saveSettings();DestroyWindow(window);return 0;}
     case WM_DESTROY:
-        KillTimer(window,1);KillTimer(window,2);KillTimer(window,3);KillTimer(window,4);KillTimer(window,5);app.shutdown();if(app.tooltip)DestroyWindow(app.tooltip);if(app.searchFont)DeleteObject(app.searchFont);PostQuitMessage(0);return 0;
+        KillTimer(window,1);KillTimer(window,2);KillTimer(window,3);KillTimer(window,4);KillTimer(window,5);KillTimer(window,6);app.buffer.reset();app.shutdown();if(app.tooltip)DestroyWindow(app.tooltip);if(app.searchFont)DeleteObject(app.searchFont);PostQuitMessage(0);return 0;
     }
     return DefWindowProcW(window,message,wp,lp);
 }
@@ -1279,6 +1337,10 @@ int selfTest(const fs::path& report) {
     Com<IWICImagingFactory> factory;
     if(FAILED(CoCreateInstance(CLSID_WICImagingFactory,nullptr,CLSCTX_INPROC_SERVER,IID_PPV_ARGS(factory.out()))))return 3;
     bool success=hashCorrect&&tamperCorrect;
+    auto fitsClient=[&](const Control& c,const RECT& client){RECT visible{};GetClientRect(c.window,&visible);HRGN region=CreateRectRgn(0,0,0,0);int kind=GetWindowRgn(c.window,region);
+        if(kind!=ERROR)GetRgnBox(region,&visible);DeleteObject(region);RECT window{};GetWindowRect(c.window,&window);POINT origin{window.left,window.top};ScreenToClient(app.window,&origin);
+        return origin.x+visible.left>=0&&origin.y+visible.top>=0&&origin.x+visible.right<=client.right&&origin.y+visible.bottom<=client.bottom;};
+
     const std::pair<const wchar_t*,GUID> formats[]={{L"png",GUID_ContainerFormatPng},{L"jpg",GUID_ContainerFormatJpeg},{L"bmp",GUID_ContainerFormatBmp},{L"tiff",GUID_ContainerFormatTiff}};
     for(const auto& format:formats) {
         auto path=temp.path/(L"Bilder ü 日本語."+std::wstring(format.first));
@@ -1336,7 +1398,7 @@ int selfTest(const fs::path& report) {
     success &=check(foto::recognized("UPPER.PNG") && !foto::recognized("image.png.exe"),"Extension registry");
     WNDCLASSEXW wc{};wc.cbSize=sizeof(wc);wc.lpfnWndProc=wndProc;wc.hInstance=GetModuleHandleW(nullptr);wc.lpszClassName=AppClass;wc.hCursor=LoadCursorW(nullptr,IDC_ARROW);wc.style=CS_DBLCLKS;
     if(RegisterClassExW(&wc)) {
-        HWND window=CreateWindowExW(0,AppClass,L"PAF-Photos · UI-Test",WS_OVERLAPPEDWINDOW|WS_CLIPCHILDREN,0,0,1180,800,nullptr,nullptr,wc.hInstance,nullptr);
+        HWND window=CreateWindowExW(WS_EX_COMPOSITED,AppClass,L"PAF-Photos · UI-Test",WS_OVERLAPPEDWINDOW|WS_CLIPCHILDREN,0,0,1180,800,nullptr,nullptr,wc.hInstance,nullptr);
         success &=check(window!=nullptr,"Create desktop window");
         if(window) {
             ShowWindow(window,SW_SHOW);
@@ -1409,8 +1471,7 @@ int selfTest(const fs::path& report) {
                 SetWindowPos(window,nullptr,0,0,size.cx,size.cy,SWP_NOZORDER);UpdateWindow(window);
                 RECT client{};GetClientRect(window,&client);bool fits=true;float scale=app.dpi/96.0f;
                 for(const auto& entry:app.controls)if(entry.second.visible) {
-                    const auto& box=entry.second.box;
-                    if(box.x<0||box.y<0||(box.x+box.w)*scale>client.right+1||(box.y+box.h)*scale>client.bottom+1)fits=false;
+                    if(!fitsClient(entry.second,client))fits=false;
                 }
                 success &=check(fits,"Responsive controls stay inside window");
             }
@@ -1434,15 +1495,41 @@ int selfTest(const fs::path& report) {
             success &=check(!foto::english&&std::wstring(accessibleName)==L"Einstellungen","German buttons switch immediately");
             command(612);success &=check(ui::background.GetR()>240,"Light theme palette");command(611);success &=check(ui::background.GetR()<50,"Dark theme palette");
             command(621);app.openPath(temp.path/L"Bild 2.png");pump();success &=check(!app.fit&&app.zoom==1,"Persisted actual-size opening preference");command(620);
-            command(Settings);SendMessageW(window,WM_MOUSEWHEEL,MAKEWPARAM(0,-WHEEL_DELTA),0);success &=check(app.settingsScroll>0,"Settings scrolling");
+            command(Settings);SendMessageW(window,WM_MOUSEWHEEL,MAKEWPARAM(0,-WHEEL_DELTA),0);success &=check(app.settingsScroll.target>0&&app.settingsScroll.position==0,"Settings wheel queues smooth pixel movement");
             bool scrollPaint=true;
-            for(int step=0;step<30;++step){SendMessageW(window,WM_MOUSEWHEEL,MAKEWPARAM(0,step<15?-WHEEL_DELTA:WHEEL_DELTA),0);
+            for(int step=0;step<30;++step){SendMessageW(window,WM_MOUSEWHEEL,MAKEWPARAM(0,step<15?-WHEEL_DELTA:WHEEL_DELTA),0);scrollFrame(1.0/60);
                 for(const auto& entry:app.controls)if(entry.second.visible&&entry.first!=Search){HWND button=entry.second.window;RECT area{};GetClientRect(button,&area);
                     HDC screen=GetDC(button),memory=CreateCompatibleDC(screen);HBITMAP bitmap=CreateCompatibleBitmap(screen,area.right,area.bottom);auto old=SelectObject(memory,bitmap);
                     PatBlt(memory,0,0,area.right,area.bottom,WHITENESS);SendMessageW(button,WM_PRINTCLIENT,reinterpret_cast<WPARAM>(memory),PRF_CLIENT);
                     scrollPaint&=SendMessageW(button,WM_ERASEBKGND,reinterpret_cast<WPARAM>(memory),0)==1&&GetPixel(memory,area.right/2,2)!=RGB(255,255,255);
                     SelectObject(memory,old);DeleteObject(bitmap);DeleteDC(memory);ReleaseDC(button,screen);}}
             success &=check(scrollPaint,"Rapid dark settings scroll paints native buttons without white erase or print backgrounds");
+            app.settingsScroll.reset(90);refresh();auto& themeButton=app.controls[Theme];RECT clipped{};HRGN nativeClip=CreateRectRgn(0,0,0,0);GetWindowRgn(themeButton.window,nativeClip);GetRgnBox(nativeClip,&clipped);DeleteObject(nativeClip);
+            success &=check(themeButton.visible&&clipped.top>0&&clipped.bottom<=themeButton.pixelBounds.bottom,"Partial settings buttons are clipped to the viewport instead of popping out");
+            app.settingsScroll.reset();refresh();scrollWheel(-15);double fractionalTarget=app.settingsScroll.target;
+            for(int frame=0;frame<80;++frame)scrollFrame(1.0/60);
+            success &=check(fractionalTarget>0&&fractionalTarget<90&&app.settingsScroll.position==fractionalTarget,"Native precision wheel input settles at fractional pixel destination");
+            app.preferences.animations=false;scrollWheel(-120);success &=check(app.settingsScroll.position==app.settingsScroll.target,"Reduced motion scrolls immediately without animation");app.preferences.animations=true;
+            auto track=scrollTrack();app.scrollGrab=0;scrollDrag(track.top+track.height-track.thumb);success &=check(app.settingsScroll.position==track.maximum&&app.settingsScroll.velocity==0,"Scrollbar reaches last setting without residual spring motion");
+            app.settingsScroll.reset(420);refresh();auto& radiusButton=app.controls[Radius];int originalRadius=app.preferences.radius;bool rounded=true;
+            for(int radius:{4,8,12,16}){app.preferences.radius=radius;for(UINT dpi:{96u,144u,192u}){app.dpi=dpi;refresh();RECT size{};GetClientRect(radiusButton.window,&size);HDC screen=GetDC(radiusButton.window),memory=CreateCompatibleDC(screen);HBITMAP bitmap=CreateCompatibleBitmap(screen,size.right,size.bottom);auto old=SelectObject(memory,bitmap);
+                SetFocus(radiusButton.window);SendMessageW(radiusButton.window,WM_PRINTCLIENT,reinterpret_cast<WPARAM>(memory),PRF_CLIENT);
+                rounded&=GetPixel(memory,0,0)==ui::raised.ToCOLORREF()&&GetPixel(memory,size.right-1,0)==ui::raised.ToCOLORREF()&&GetPixel(memory,size.right/2,int(10*dpi/96))!=ui::surface.ToCOLORREF();
+                SelectObject(memory,old);DeleteObject(bitmap);DeleteDC(memory);ReleaseDC(radiusButton.window,screen);}}
+            app.dpi=96;app.preferences.radius=originalRadius;app.settingsScroll.reset();SetFocus(window);refresh();
+            success &=check(rounded,"Raised rounded buttons and focus retain clean corners at 100/150/200 percent DPI");
+            // Reused drawing surfaces must not accumulate GDI objects over a long scroll.
+            for(int frame=0;frame<60;++frame){app.settingsScroll.add(frame<30?40:-40,scrollTrack().maximum);scrollFrame(1.0/60);}
+            DWORD objects=GetGuiResources(GetCurrentProcess(),GR_GDIOBJECTS);auto began=std::chrono::steady_clock::now();
+            for(int frame=0;frame<120;++frame){app.settingsScroll.add(frame<60?24:-24,scrollTrack().maximum);scrollFrame(1.0/60);}
+            auto elapsed=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-began).count();
+            log<<"Scroll render average: "<<elapsed/120<<" ms per frame (test machine, not a display FPS guarantee)\n";
+            success &=check(GetGuiResources(GetCurrentProcess(),GR_GDIOBJECTS)<=objects+4,"Repeated scrolling reuses drawing resources without leaking GDI objects");
+            SetWindowPos(window,nullptr,0,0,780,560,SWP_NOZORDER);command(Gallery);app.tileSize=150;app.galleryScroll.reset();refresh();scrollWheel(-120);scrollFrame(1.0/60);
+            success &=check(app.galleryScroll.position>0&&app.galleryScroll.position<app.galleryScroll.target,"Gallery moves by pixels rather than jumping a whole row");
+            auto& tile=app.controls[GalleryBase];HRGN tileClip=CreateRectRgn(0,0,0,0);GetWindowRgn(tile.window,tileClip);GetRgnBox(tileClip,&clipped);DeleteObject(tileClip);
+            success &=check(tile.visible&&clipped.top>0,"Partial gallery thumbnails stay clipped below the gallery toolbar");
+            SetWindowPos(window,nullptr,0,0,1180,800,SWP_NOZORDER);command(Settings);app.settingsScroll.reset();refresh();
             command(Maximize);success &=check(IsZoomed(window),"Integrated title-bar maximize");command(Maximize);success &=check(!IsZoomed(window),"Integrated title-bar restore");
             command(Gallery);command(NavToggle);
             success &=check(app.navExpanded&&app.controls[Gallery].box.w>180,"Expanded navigation");
@@ -1450,12 +1537,12 @@ int selfTest(const fs::path& report) {
             SetFocus(app.search);MSG tab{};tab.hwnd=app.search;tab.message=WM_KEYDOWN;tab.wParam=VK_TAB;dispatchMessage(tab);
             success &=check(GetFocus()!=app.search,"Tab leaves the native search field");
             for(int page:{Gallery,Settings}){SetWindowPos(window,nullptr,0,0,780,560,SWP_NOZORDER);command(page);command(NavToggle);RECT client{};GetClientRect(window,&client);bool fits=true;float scale=app.dpi/96.0f;
-                for(const auto& c:app.controls)if(c.second.visible){auto b=c.second.box;if(b.x<0||b.y<0||(b.x+b.w)*scale>client.right+1||(b.y+b.h)*scale>client.bottom+1)fits=false;}
+                for(const auto& c:app.controls)if(c.second.visible){if(!fitsClient(c.second,client))fits=false;}
                 success &=check(fits,"Small gallery/settings with expanded navigation");command(NavToggle);}
             for(UINT dpi:{96u,144u,192u}){
                 RECT size{0,0,LONG(1200*dpi/96),LONG(840*dpi/96)};SendMessageW(window,WM_DPICHANGED,MAKEWPARAM(dpi,dpi),reinterpret_cast<LPARAM>(&size));
                 for(int page:{Gallery,Settings}){command(page);RECT client{};GetClientRect(window,&client);bool fits=true;float scale=dpi/96.0f;
-                    for(const auto& c:app.controls)if(c.second.visible){auto b=c.second.box;if(b.x<0||b.y<0||(b.x+b.w)*scale>client.right+1||(b.y+b.h)*scale>client.bottom+1)fits=false;}
+                    for(const auto& c:app.controls)if(c.second.visible){if(!fitsClient(c.second,client))fits=false;}
                     success &=check(fits,"Gallery/settings bounds at 100/150/200 percent DPI");}
             }
             app.preferences.language=originalLanguage;app.applyLanguage();
@@ -1518,7 +1605,7 @@ int WINAPI wWinMain(HINSTANCE instance,HINSTANCE,PWSTR,int show) {
     if(!RegisterClassExW(&wc)){LocalFree(args);ui::releaseBrand();GdiplusShutdown(token);if(SUCCEEDED(co))CoUninitialize();return 1;}
     RECT work{};SystemParametersInfoW(SPI_GETWORKAREA,0,&work,0);
     UINT dpi=GetDpiForSystem();int width=std::min(int(app.preferences.width*dpi/96),int(work.right-work.left)),height=std::min(int(app.preferences.height*dpi/96),int(work.bottom-work.top));
-    HWND window=CreateWindowExW(0,AppClass,AppTitle,WS_OVERLAPPEDWINDOW|WS_CLIPCHILDREN,work.left+(work.right-work.left-width)/2,work.top+(work.bottom-work.top-height)/2,width,height,nullptr,nullptr,instance,nullptr);
+    HWND window=CreateWindowExW(WS_EX_COMPOSITED,AppClass,AppTitle,WS_OVERLAPPEDWINDOW|WS_CLIPCHILDREN,work.left+(work.right-work.left-width)/2,work.top+(work.bottom-work.top-height)/2,width,height,nullptr,nullptr,instance,nullptr);
     if(!window){LocalFree(args);ui::releaseBrand();GdiplusShutdown(token);if(SUCCEEDED(co))CoUninitialize();return 1;}
     BOOL dark=TRUE;DwmSetWindowAttribute(window,20,&dark,sizeof(dark));
     ui::palette();
