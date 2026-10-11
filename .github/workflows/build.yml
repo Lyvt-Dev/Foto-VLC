@@ -1,0 +1,78 @@
+name: Build and release Foto VLC
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  portable-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build build --parallel 2
+      - name: Test actual decoders and core
+        run: ctest --test-dir build --output-on-failure
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure x64
+        run: cmake -S . -B build -A x64
+      - name: Build release
+        run: cmake --build build --config Release --parallel 2
+      - name: Test decoders and core
+        run: ctest --test-dir build -C Release --output-on-failure
+      - name: Test Windows WIC, rendering and desktop controls
+        shell: pwsh
+        run: |
+          $report = Join-Path $pwd 'build/windows-self-test.txt'
+          $process = Start-Process -FilePath 'build/Release/FotoVLC.exe' -ArgumentList @('--self-test', $report) -Wait -PassThru
+          if (Test-Path $report) { Get-Content $report }
+          if ($process.ExitCode -ne 0) { throw "Windows self-test failed: $($process.ExitCode)" }
+          if (!(Test-Path $report)) { throw 'Missing Windows self-test report' }
+      - name: Package portable app
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path dist/package -Force | Out-Null
+          Copy-Item build/Release/FotoVLC.exe dist/FotoVLC.exe
+          Copy-Item build/Release/FotoVLC.exe, README.md, LICENSE, THIRD_PARTY_NOTICES.md dist/package/
+          Copy-Item docs/formats.md dist/package/FORMATS.md
+          Copy-Item third_party/stb/LICENSE dist/package/STB-LICENSE.txt
+          Copy-Item third_party/nanosvg/LICENSE.txt dist/package/NANOSVG-LICENSE.txt
+          Copy-Item build/windows-self-test.txt dist/windows-self-test.txt
+          Compress-Archive -Path dist/package/* -DestinationPath dist/FotoVLC-Windows-x64.zip
+          $sum = (Get-FileHash dist/FotoVLC.exe -Algorithm SHA256).Hash.ToLower()
+          "$sum  FotoVLC.exe" | Set-Content -Encoding ascii dist/SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FotoVLC-Windows-x64
+          path: |
+            dist/FotoVLC.exe
+            dist/FotoVLC-Windows-x64.zip
+            dist/SHA256SUMS.txt
+            dist/windows-self-test.txt
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [portable-tests, windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: FotoVLC-Windows-x64
+          path: dist
+      - name: Publish tested executable
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            dist/FotoVLC.exe dist/FotoVLC-Windows-x64.zip dist/SHA256SUMS.txt dist/windows-self-test.txt \
+            --verify-tag --title "Foto VLC $GITHUB_REF_NAME" --notes-file docs/release-notes.md
