@@ -27,7 +27,7 @@ jobs:
         shell: pwsh
         run: |
           $project = Get-Content CMakeLists.txt -Raw
-          $version = [regex]::Match($project, 'project\(PAFPhotos VERSION ([0-9.]+)').Groups[1].Value
+          $version = [regex]::Match($project, 'set\(PAF_RELEASE_VERSION "([0-9.]+(?:-fix)?)"\)').Groups[1].Value
           if ($env:GITHUB_REF_NAME -ne "v$version") { throw 'Release tag does not match the application version' }
       - name: Configure x64
         run: cmake -S . -B build -A x64
@@ -107,7 +107,7 @@ jobs:
         run: |
           Copy-Item THIRD_PARTY_NOTICES.md build/Release/codecs/PAF-NOTICES.md
           Compress-Archive -Path build/Release/codecs/* -DestinationPath dist/PAFPhotos-Decoders-x64.zip
-          $version = [regex]::Match((Get-Content CMakeLists.txt -Raw), 'project\(PAFPhotos VERSION ([0-9.]+)').Groups[1].Value
+          $version = [regex]::Match((Get-Content CMakeLists.txt -Raw), 'set\(PAF_RELEASE_VERSION "([0-9.]+(?:-fix)?)"\)').Groups[1].Value
           $sum = (Get-FileHash dist/PAFPhotos-Decoders-x64.zip -Algorithm SHA256).Hash.ToLower()
           "$sum  PAFPhotos-Decoders-x64.zip" | Add-Content -Encoding ascii dist/SHA256SUMS.txt
           $manifest = [ordered]@{version=$version;sha256=$sum;size=(Get-Item dist/PAFPhotos-Decoders-x64.zip).Length}
@@ -115,7 +115,7 @@ jobs:
       - name: Build and test Windows installer
         shell: pwsh
         run: |
-          $version = [regex]::Match((Get-Content CMakeLists.txt -Raw), 'project\(PAFPhotos VERSION ([0-9.]+)').Groups[1].Value
+          $version = [regex]::Match((Get-Content CMakeLists.txt -Raw), 'set\(PAF_RELEASE_VERSION "([0-9.]+(?:-fix)?)"\)').Groups[1].Value
           $payload = Join-Path $pwd 'dist/package'
           $compiler = 'C:/Program Files (x86)/Inno Setup 6/ISCC.exe'
           if (!(Test-Path $compiler)) { throw 'Inno Setup compiler is missing from the Windows runner' }

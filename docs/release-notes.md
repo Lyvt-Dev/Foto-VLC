@@ -1,3 +1,11 @@
+# 0.7.2-fix
+
+- Editor buttons paint their full pixel bounds with no native square outlines or stale corner pixels.
+- Trackbars suppress native theme painting and repaint their entire buffered surface on position and focus changes, avoiding duplicate thumb rings and movement trails.
+- Keep keyboard navigation and native slider interaction; match the surrounding canvas or sidebar background.
+- Add native rendering regressions for button edges and incremental slider painting, and validate fix-version update ordering.
+- This release is named `0.7.2-fix`. Install it manually from `setup.exe`: older releases accept numeric-only update manifests. This fix accepts both numeric releases and the `-fix` suffix for subsequent updates.
+
 PAF-Photos 0.7.2 introduces a full photo-editing workspace inspired by the supplied Windows Photos references, with PAF colors, rounded controls and offline processing.
 
 - A large image canvas, centered icon tool tabs, zoom/fit, reset, undo/redo, Save options and Cancel/Done replace the small editing sidebar. The filename and app version stay visible. The gallery window is hidden while editing, leaving one visible app frame. Hold Space to compare the original.
