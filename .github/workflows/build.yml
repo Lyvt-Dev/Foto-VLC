@@ -74,6 +74,7 @@ jobs:
             Get-Content $report
             Get-Content $report | Where-Object { $_ -match '^FAIL' } | ForEach-Object { Write-Output "::error::$_" }
           }
+          Get-Content $report | Where-Object { $_ -match '^Scroll render average:' } | ForEach-Object { Write-Output "::notice::$_" }
           if ($process.ExitCode -ne 0) {
             Write-Output "::error::Windows self-test process exit code: $($process.ExitCode)"
             if (Test-Path $report) { Get-Content $report -Tail 8 | ForEach-Object { Write-Output "::error::Last runtime check: $_" } }

@@ -162,7 +162,7 @@ struct App {
     bool gallery=true,favoritesView=false,settings=false,navExpanded=false,selectMode=false,reverseSort=false;
     paf::ScrollMotion galleryScroll,settingsScroll;
     double galleryMaxScroll=0;int tileSize=210;
-    std::chrono::steady_clock::time_point motionTime{};bool scrollAnimating=false;float scrollGrab=0;RenderBuffer buffer;
+    std::chrono::steady_clock::time_point motionTime{};bool scrollAnimating=false,hoverAnimating=false;std::chrono::steady_clock::time_point hoverTime{};float scrollGrab=0;RenderBuffer buffer;
     bool scrollDragging=false;
     std::vector<fs::path> library,filtered;
     std::set<fs::path> selected;
@@ -178,6 +178,7 @@ struct App {
     bool installed=false,installUpdateNow=false,restartAfterUpdate=false,exportNotice=false;
     fs::path executableDirectory;
     bool mirrored=false,exporting=false;
+    std::optional<bool> testMotion;
     int rotation=0,helpPage=-1,hover=0;
     double zoom=1,panX=0,panY=0;
     POINT drag{};
@@ -478,8 +479,8 @@ bool shortcut(UINT key) {
     }else return false;
     return true;
 }
-bool motionEnabled(){BOOL enabled=TRUE;SystemParametersInfoW(SPI_GETCLIENTAREAANIMATION,0,&enabled,0);return app.preferences.animations&&enabled;}
-void animateButtons(){if(motionEnabled())SetTimer(app.window,4,16,nullptr);else for(auto& entry:app.controls){entry.second.hoverProgress=app.hover==entry.first?1.0f:0.0f;InvalidateRect(entry.second.window,nullptr,FALSE);}}
+bool motionEnabled(){BOOL enabled=TRUE;if(app.testing&&app.testMotion)enabled=*app.testMotion;else SystemParametersInfoW(SPI_GETCLIENTAREAANIMATION,0,&enabled,0);return app.preferences.animations&&enabled;}
+void animateButtons(){if(motionEnabled()){if(!app.hoverAnimating){app.hoverTime=std::chrono::steady_clock::now();app.hoverAnimating=true;SetTimer(app.window,4,16,nullptr);}}else{KillTimer(app.window,4);app.hoverAnimating=false;for(auto& entry:app.controls){entry.second.hoverProgress=app.hover==entry.first?1.0f:0.0f;if(entry.second.visible)InvalidateRect(entry.second.window,nullptr,FALSE);}}}
 Color blend(Color from,Color to,float progress){return Color(255,BYTE(from.GetR()+(to.GetR()-from.GetR())*progress),BYTE(from.GetG()+(to.GetG()-from.GetG())*progress),BYTE(from.GetB()+(to.GetB()-from.GetB())*progress));}
 LRESULT CALLBACK buttonProc(HWND window,UINT msg,WPARAM wp,LPARAM lp,UINT_PTR,DWORD_PTR id) {
     switch(msg) {
@@ -919,7 +920,7 @@ void scrollWheel(short delta){if(!delta)return;auto track=scrollTrack();UINT lin
     if(!motionEnabled()){motion.reset(motion.target);redrawScroll();return;}
     if(!app.scrollAnimating){app.motionTime=std::chrono::steady_clock::now();app.scrollAnimating=true;SetTimer(app.window,6,16,nullptr);}
 }
-void scrollDrag(float y){auto track=scrollTrack();double fraction=track.height>track.thumb?std::clamp(double(y-track.top-app.scrollGrab)/(track.height-track.thumb),0.0,1.0):0;
+void scrollDrag(float y){auto track=scrollTrack();double distance=y-track.top-app.scrollGrab,range=track.height-track.thumb;double fraction=range>0?(distance>=range-0.5?1.0:std::clamp(distance/range,0.0,1.0)):0;
     (app.settings?app.settingsScroll:app.galleryScroll).reset(fraction*track.maximum);redrawScroll();}
 struct SettingRow{float y;const wchar_t* title;const wchar_t* description;Icon icon;int action;};
 std::vector<SettingRow> settingsRows(){return {
@@ -1286,7 +1287,9 @@ LRESULT CALLBACK wndProc(HWND window,UINT message,WPARAM wp,LPARAM lp) {
         if(wp==5&&app.preferences.autoUpdates)checkUpdates();
         if(wp==1&&!app.busy&&app.files.size()>1&&app.helpPage<0)command(Next);
         if(wp==2&&app.busy)InvalidateRect(window,nullptr,FALSE);
-        if(wp==4){bool active=false;for(auto& entry:app.controls){auto& c=entry.second;float target=app.hover==entry.first?1.0f:0.0f;if(std::abs(c.hoverProgress-target)>0.01f){c.hoverProgress=motionEnabled()?c.hoverProgress+(target-c.hoverProgress)*0.28f:target;if(std::abs(c.hoverProgress-target)<0.01f)c.hoverProgress=target;InvalidateRect(c.window,nullptr,FALSE);active|=c.hoverProgress!=target;}}if(!active)KillTimer(window,4);}
+        if(wp==4){auto now=std::chrono::steady_clock::now();double elapsed=std::max(0.001,std::chrono::duration<double>(now-app.hoverTime).count());app.hoverTime=now;float amount=motionEnabled()?float(1-std::exp(-elapsed/0.055)):1;bool active=false;
+            for(auto& entry:app.controls){auto& c=entry.second;float target=app.hover==entry.first?1.0f:0.0f;if(std::abs(c.hoverProgress-target)>0.01f){c.hoverProgress+=(target-c.hoverProgress)*amount;if(std::abs(c.hoverProgress-target)<0.01f)c.hoverProgress=target;if(c.visible)InvalidateRect(c.window,nullptr,FALSE);active|=c.hoverProgress!=target;}}
+            if(!active){KillTimer(window,4);app.hoverAnimating=false;}}
         if(wp==3){app.notice.clear();KillTimer(window,3);InvalidateRect(window,nullptr,FALSE);}
         return 0;
     case WM_CLOSE:{
@@ -1328,6 +1331,7 @@ int selfTest(const fs::path& report) {
     std::ofstream log(report);int passed=0;
     auto check=[&](bool ok,const char* name){log<<(ok?"PASS ":"FAIL ")<<name<<"\n";log.flush();if(ok)++passed;return ok;};
     TempDirectory temp;if(temp.path.empty())return 2;
+    BOOL systemMotion=TRUE;SystemParametersInfoW(SPI_GETCLIENTAREAANIMATION,0,&systemMotion,0);bool policyCorrect=motionEnabled()==bool(systemMotion);check(policyCorrect,"Windows reduced-motion policy is respected");app.testMotion=true;
     auto hashFile=temp.path/L"hash.txt";{std::ofstream data(hashFile,std::ios::binary);data<<"abc";}
     bool hashCorrect=updateHash(hashFile)=="ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
     check(hashCorrect,"Updater SHA256 matches independent known vector");
@@ -1336,7 +1340,7 @@ int selfTest(const fs::path& report) {
     check(tamperCorrect,"Updater detects changed and missing files");
     Com<IWICImagingFactory> factory;
     if(FAILED(CoCreateInstance(CLSID_WICImagingFactory,nullptr,CLSCTX_INPROC_SERVER,IID_PPV_ARGS(factory.out()))))return 3;
-    bool success=hashCorrect&&tamperCorrect;
+    bool success=hashCorrect&&tamperCorrect&&policyCorrect;
     auto fitsClient=[&](const Control& c,const RECT& client){RECT visible{};GetClientRect(c.window,&visible);HRGN region=CreateRectRgn(0,0,0,0);int kind=GetWindowRgn(c.window,region);
         if(kind!=ERROR)GetRgnBox(region,&visible);DeleteObject(region);RECT window{};GetWindowRect(c.window,&window);POINT origin{window.left,window.top};ScreenToClient(app.window,&origin);
         return origin.x+visible.left>=0&&origin.y+visible.top>=0&&origin.x+visible.right<=client.right&&origin.y+visible.bottom<=client.bottom;};
@@ -1519,6 +1523,8 @@ int selfTest(const fs::path& report) {
             app.dpi=96;app.preferences.radius=originalRadius;app.settingsScroll.reset();SetFocus(window);refresh();
             success &=check(rounded,"Raised rounded buttons and focus retain clean corners at 100/150/200 percent DPI");
             // Reused drawing surfaces must not accumulate GDI objects over a long scroll.
+            for(double position=0;position<scrollTrack().maximum;position+=100){app.settingsScroll.reset(position);redrawScroll();}
+            app.settingsScroll.reset(scrollTrack().maximum);redrawScroll();app.settingsScroll.reset();redrawScroll();
             for(int frame=0;frame<60;++frame){app.settingsScroll.add(frame<30?40:-40,scrollTrack().maximum);scrollFrame(1.0/60);}
             DWORD objects=GetGuiResources(GetCurrentProcess(),GR_GDIOBJECTS);auto began=std::chrono::steady_clock::now();
             for(int frame=0;frame<120;++frame){app.settingsScroll.add(frame<60?24:-24,scrollTrack().maximum);scrollFrame(1.0/60);}
