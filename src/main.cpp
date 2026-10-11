@@ -369,13 +369,14 @@ void icon(Graphics& g,Icon type,float x,float y,Color color=text,float size=20) 
     }
     g.Restore(state);
 }
+Com<IStream> brandStream;
+std::unique_ptr<Bitmap> brandBitmap;
+void releaseBrand(){brandBitmap.reset();brandStream.out();}
 void brand(Graphics& g,float x,float y,float size=28) {
-    static Com<IStream> stream;
-    static std::unique_ptr<Bitmap> logo;
-    if(!logo){auto module=GetModuleHandleW(nullptr);auto resource=FindResourceW(module,MAKEINTRESOURCEW(10),RT_RCDATA);
-        if(resource){auto data=LoadResource(module,resource);stream.p=SHCreateMemStream(static_cast<const BYTE*>(LockResource(data)),SizeofResource(module,resource));
-            if(stream.p)logo.reset(Bitmap::FromStream(stream));}}
-    if(logo&&logo->GetLastStatus()==Ok)g.DrawImage(logo.get(),RectF(x,y,size,size));
+    if(!brandBitmap){auto module=GetModuleHandleW(nullptr);auto resource=FindResourceW(module,MAKEINTRESOURCEW(10),RT_RCDATA);
+        if(resource){auto data=LoadResource(module,resource);brandStream.p=SHCreateMemStream(static_cast<const BYTE*>(LockResource(data)),SizeofResource(module,resource));
+            if(brandStream.p)brandBitmap.reset(Bitmap::FromStream(brandStream));}}
+    if(brandBitmap&&brandBitmap->GetLastStatus()==Ok)g.DrawImage(brandBitmap.get(),RectF(x,y,size,size));
 }
 void drawPicture(Graphics& g,const Picture& p,foto::Box box,bool crop=false) {
     float scale=crop?std::max(box.w/p.width,box.h/p.height):std::min(box.w/p.width,box.h/p.height);
@@ -743,7 +744,7 @@ void paint(HWND window) {
             if(app.picture)status+=L"   ·   "+std::to_wstring(app.picture->originalW)+L" × "+std::to_wstring(app.picture->originalH)+L" px   ·   "+app.fileSize;
             if(app.slideshow)status+=tr(L"   ·   Diashow läuft");
         }
-        ui::label(g,app.notice.empty()?status:app.notice,{20,h-27,w-295,26},10,app.notice.empty()?ui::muted:ui::accent);
+        ui::label(g,app.exporting?tr(L"Bild wird konvertiert …"):app.notice.empty()?status:app.notice,{20,h-27,w-295,26},10,app.notice.empty()?ui::muted:ui::accent);
         ui::label(g,std::wstring(L"Photo VLC " FOTO_VERSION_WSTRING)+tr(L"   ·   F1 Hilfe"),{w-230,h-27,210,26},10,ui::faint,false,true);
     }
     BitBlt(dc,0,0,bounds.right,bounds.bottom,memory,0,0,SRCCOPY);SelectObject(memory,previous);DeleteObject(buffer);DeleteDC(memory);EndPaint(window,&ps);
@@ -916,7 +917,7 @@ void choose(bool folder,bool import=false) {
 void chooseExport() {
     if(!app.picture||app.busy||app.exporting||app.files.empty())return;
     auto& picture=*app.picture;
-    if((picture.originalW>picture.width||picture.originalH>picture.height||picture.frames>1)&&
+    if((picture.originalW>picture.width||picture.originalH>picture.height||picture.frames>1||picture.engine.find(L"ImageMagick")!=std::wstring::npos)&&
        MessageBoxW(app.window,tr(L"Exportiert wird das angezeigte Rasterbild mit seinen aktuellen Pixelmaßen. Bei Animationen oder mehrseitigen Dateien nur das erste Bild. Fortfahren?"),tr(L"Bild konvertieren"),MB_OKCANCEL|MB_ICONINFORMATION)!=IDOK)return;
     Com<IFileSaveDialog> dialog;
     if(FAILED(CoCreateInstance(CLSID_FileSaveDialog,nullptr,CLSCTX_INPROC_SERVER,IID_PPV_ARGS(dialog.out()))))return;
@@ -931,6 +932,8 @@ void chooseExport() {
     PWSTR chosen=nullptr;if(FAILED(item->GetDisplayName(SIGDN_FILESYSPATH,&chosen)))return;
     fs::path target(chosen);CoTaskMemFree(chosen);auto before=target;
     auto format=static_cast<ExportFormat>(type-1);target.replace_extension(exportExtension(format));
+    // Some shell implementations append the chosen extension twice.
+    while(CompareStringOrdinal(target.stem().extension().c_str(),-1,target.extension().c_str(),-1,TRUE)==CSTR_EQUAL)target=target.parent_path()/target.stem();
     std::error_code error;
     if(target!=before&&fs::exists(target,error)&&MessageBoxW(app.window,tr(L"Die Zieldatei existiert bereits. Ersetzen?"),tr(L"Bild konvertieren"),MB_YESNO|MB_ICONQUESTION)!=IDYES)return;
     app.exportCopy(target,format);
@@ -1191,7 +1194,7 @@ void dispatchMessage(MSG& message) {
 int selfTest(const fs::path& report) {
     app.testing=true;
     std::ofstream log(report);int passed=0;
-    auto check=[&](bool ok,const char* name){log<<(ok?"PASS ":"FAIL ")<<name<<"\n";if(ok)++passed;return ok;};
+    auto check=[&](bool ok,const char* name){log<<(ok?"PASS ":"FAIL ")<<name<<"\n";log.flush();if(ok)++passed;return ok;};
     TempDirectory temp;if(temp.path.empty())return 2;
     Com<IWICImagingFactory> factory;
     if(FAILED(CoCreateInstance(CLSID_WICImagingFactory,nullptr,CLSCTX_INPROC_SERVER,IID_PPV_ARGS(factory.out()))))return 3;
@@ -1382,7 +1385,7 @@ int selfTest(const fs::path& report) {
 }
 int codecSelfTest(const fs::path& directory,const fs::path& report){
     std::ofstream log(report);bool success=true;int passed=0;
-    auto check=[&](bool ok,const std::string& name){log<<(ok?"PASS ":"FAIL ")<<name<<"\n";if(ok)++passed;else success=false;};
+    auto check=[&](bool ok,const std::string& name){log<<(ok?"PASS ":"FAIL ")<<name<<"\n";log.flush();if(ok)++passed;else success=false;};
     check(!magickPath().empty(),"Portable codec discovery");
     for(const auto* extension:{L"avif",L"heic",L"jxl",L"jp2",L"exr",L"dds",L"pcx"}){
         std::wstring suffix(extension);std::string name(suffix.begin(),suffix.end());
@@ -1403,18 +1406,18 @@ int WINAPI wWinMain(HINSTANCE instance,HINSTANCE,PWSTR,int show) {
     INITCOMMONCONTROLSEX controls{sizeof(controls),ICC_WIN95_CLASSES};InitCommonControlsEx(&controls);
     SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
     int argc=0;LPWSTR* args=CommandLineToArgvW(GetCommandLineW(),&argc);
-    if(argc>3&&std::wstring(args[1])==L"--codec-test"){foto::english=true;int result=codecSelfTest(args[2],args[3]);LocalFree(args);GdiplusShutdown(token);if(SUCCEEDED(co))CoUninitialize();return result;}
+    if(argc>3&&std::wstring(args[1])==L"--codec-test"){foto::english=true;int result=codecSelfTest(args[2],args[3]);LocalFree(args);ui::releaseBrand();GdiplusShutdown(token);if(SUCCEEDED(co))CoUninitialize();return result;}
     if(argc>1&&std::wstring(args[1])==L"--self-test") {
-        int result=selfTest(argc>2?fs::path(args[2]):fs::path(L"self-test.txt"));LocalFree(args);GdiplusShutdown(token);if(SUCCEEDED(co))CoUninitialize();return result;
+        int result=selfTest(argc>2?fs::path(args[2]):fs::path(L"self-test.txt"));LocalFree(args);ui::releaseBrand();GdiplusShutdown(token);if(SUCCEEDED(co))CoUninitialize();return result;
     }
     app.initSettings();
     WNDCLASSEXW wc{};wc.cbSize=sizeof(wc);wc.style=CS_DBLCLKS;wc.lpfnWndProc=wndProc;wc.hInstance=instance;wc.lpszClassName=AppClass;
     wc.hCursor=LoadCursorW(nullptr,IDC_ARROW);wc.hIcon=LoadIconW(instance,MAKEINTRESOURCEW(2));wc.hIconSm=wc.hIcon;
-    if(!RegisterClassExW(&wc)){LocalFree(args);GdiplusShutdown(token);if(SUCCEEDED(co))CoUninitialize();return 1;}
+    if(!RegisterClassExW(&wc)){LocalFree(args);ui::releaseBrand();GdiplusShutdown(token);if(SUCCEEDED(co))CoUninitialize();return 1;}
     RECT work{};SystemParametersInfoW(SPI_GETWORKAREA,0,&work,0);
     UINT dpi=GetDpiForSystem();int width=std::min(int(app.preferences.width*dpi/96),int(work.right-work.left)),height=std::min(int(app.preferences.height*dpi/96),int(work.bottom-work.top));
     HWND window=CreateWindowExW(0,AppClass,AppTitle,WS_OVERLAPPEDWINDOW|WS_CLIPCHILDREN,work.left+(work.right-work.left-width)/2,work.top+(work.bottom-work.top-height)/2,width,height,nullptr,nullptr,instance,nullptr);
-    if(!window){LocalFree(args);GdiplusShutdown(token);if(SUCCEEDED(co))CoUninitialize();return 1;}
+    if(!window){LocalFree(args);ui::releaseBrand();GdiplusShutdown(token);if(SUCCEEDED(co))CoUninitialize();return 1;}
     BOOL dark=TRUE;DwmSetWindowAttribute(window,20,&dark,sizeof(dark));
     ui::palette();
     ShowWindow(window,show);UpdateWindow(window);
@@ -1424,5 +1427,5 @@ int WINAPI wWinMain(HINSTANCE instance,HINSTANCE,PWSTR,int show) {
     while((status=GetMessageW(&message,nullptr,0,0))>0) {
         dispatchMessage(message);
     }
-    GdiplusShutdown(token);if(SUCCEEDED(co))CoUninitialize();return status<0?1:int(message.wParam);
+    ui::releaseBrand();GdiplusShutdown(token);if(SUCCEEDED(co))CoUninitialize();return status<0?1:int(message.wParam);
 }

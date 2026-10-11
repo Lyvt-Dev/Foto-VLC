@@ -195,4 +195,4 @@ Codec-Pfad, die „Öffnen mit“-Registrierung und eine stille Deinstallation.
 Die Anwendung legt Einstellungen getrennt unter `%LOCALAPPDATA%\PhotoVLC` ab;
 diese bleiben bei der Deinstallation erhalten.
 
-Image conversion runs in the background; viewing controls stay responsive during encoding.
+Die Konvertierung läuft im Hintergrund; die Bildansicht bleibt während des Speicherns bedienbar.

@@ -74,7 +74,11 @@ jobs:
             Get-Content $report
             Get-Content $report | Where-Object { $_ -match '^FAIL' } | ForEach-Object { Write-Output "::error::$_" }
           }
-          if ($process.ExitCode -ne 0) { throw "Windows self-test failed: $($process.ExitCode)" }
+          if ($process.ExitCode -ne 0) {
+            Write-Output "::error::Windows self-test process exit code: $($process.ExitCode)"
+            if (Test-Path $report) { Get-Content $report -Tail 8 | ForEach-Object { Write-Output "::error::Last runtime check: $_" } }
+            throw "Windows self-test failed: $($process.ExitCode)"
+          }
           if (!(Test-Path $report)) { throw 'Missing Windows self-test report' }
       - name: Package portable app
         shell: pwsh
@@ -104,8 +108,8 @@ jobs:
           $payload = Join-Path $pwd 'dist/package'
           $compiler = 'C:/Program Files (x86)/Inno Setup 6/ISCC.exe'
           if (!(Test-Path $compiler)) { throw 'Inno Setup compiler is missing from the Windows runner' }
-          & $compiler "/DAppVersion=$version" "/DPayloadDir=$payload" installer/PhotoVLC.iss
-          if ($LASTEXITCODE -ne 0) { throw 'Installer compilation failed' }
+          & $compiler "/DAppVersion=$version" "/DPayloadDir=$payload" installer/PhotoVLC.iss 2>&1 | Tee-Object build/installer.log
+          if ($LASTEXITCODE -ne 0) { Get-Content build/installer.log -Tail 10 | ForEach-Object { Write-Output "::error::$_" }; throw 'Installer compilation failed' }
           $destination = Join-Path $pwd 'build/installer-test'
           $install = Start-Process dist/setup.exe -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=`"$destination`"") -Wait -PassThru
           if ($install.ExitCode -ne 0) { throw 'Silent installation failed' }
