@@ -20,6 +20,11 @@ int main(){
  auto q=foto::embedded(qoi,"qoi");CHECK(q);CHECK(q.rgba==std::vector<std::uint8_t>({255,0,0,128,255,0,0,128}));
  qoi[19]=0xc1;CHECK(!foto::embedded(qoi,"qoi"));
  qoi.pop_back();CHECK(!foto::embedded(qoi,"qoi"));
+ std::vector<std::uint8_t> psd={'8','B','P','S',0,1,0,0,0,0,0,0,0,3,0,0,0,1,0,0,0,1,0,8,0,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,255,0,0};
+ auto composite=foto::embedded(psd,"psd");CHECK(composite);CHECK(composite.width==1&&composite.height==1);CHECK(composite.rgba==std::vector<std::uint8_t>({255,0,0,255}));
+ auto pgm=bytes("P5\n1 1\n255\n");pgm.push_back(100);auto gray=foto::embedded(pgm,"pgm");CHECK(gray);CHECK(gray.rgba==std::vector<std::uint8_t>({100,100,100,255}));
+ std::vector<std::uint8_t> rle(18,0);rle[2]=10;rle[12]=2;rle[14]=1;rle[16]=24;rle.insert(rle.end(),{129,0,255,0});
+ auto repeated=foto::embedded(rle,"tga");CHECK(repeated);CHECK(repeated.rgba==std::vector<std::uint8_t>({0,255,0,255,0,255,0,255}));
  CHECK(!foto::embedded(bytes("invalid"),"psd"));
  CHECK(!foto::embedded({},"tga"));
  CHECK(!foto::embedded(bytes("P6\n100000 100000\n255\n"),"ppm"));

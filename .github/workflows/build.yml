@@ -30,7 +30,7 @@ jobs:
           cmake --build build --config Release --parallel 2 2>&1 | Tee-Object build/build.log
           $result = $LASTEXITCODE
           if ($result -ne 0) {
-            Get-Content build/build.log | Where-Object { $_ -match 'error (C[0-9]+|LNK[0-9]+|RC[0-9]+|MSB[0-9]+)' } | ForEach-Object { Write-Output "::error::$_" }
+            Get-Content build/build.log | Where-Object { $_ -match 'error (C[0-9]+|LNK[0-9]+|RC[0-9]+|MSB[0-9]+|CVT[0-9]+)' } | ForEach-Object { Write-Output "::error::$_" }
           }
           exit $result
       - name: Test decoders and core

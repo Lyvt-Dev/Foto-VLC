@@ -18,6 +18,8 @@ if(WIN32)
     target_include_directories(FotoVLC PRIVATE assets)
     if(MSVC)
         target_compile_options(FotoVLC PRIVATE /utf-8 /W4)
+        # app.rc embeds our DPI-aware, asInvoker manifest; avoid a duplicate resource.
+        target_link_options(FotoVLC PRIVATE /MANIFEST:NO)
         target_compile_options(core_test PRIVATE /utf-8 /W4)
     endif()
     target_compile_definitions(FotoVLC PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
