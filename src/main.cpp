@@ -4,6 +4,7 @@
 #include "motion.hpp"
 #include "edit.hpp"
 #include "resize_dialog.hpp"
+#include "photo_editor.hpp"
 #include "codec_pack.hpp"
 #include <commdlg.h>
 #include "core.hpp"
@@ -1257,7 +1258,8 @@ void command(int id) {
     case RestoreHidden:app.preferences.hidden.clear();app.saveSettings();app.rebuildLibrary();break;
     case DecoderPage:app.decoderPage=true;app.gallery=true;app.settings=false;app.helpPage=-1;break;
     case InstallCodecs:app.codecs.start(app.window,CodecDone,FOTO_VERSION_STRING);refresh();return;
-    case Edit:if(loaded)app.editing=!app.editing;break;
+    case Edit:if(loaded&&!app.exporting){if(app.testing)app.editing=!app.editing;else {auto source=std::make_shared<Picture>(*app.picture);if(app.mirrored)foto::orientBGRA(source->pixels,source->width,source->height,2);foto::orientBGRA(source->pixels,source->width,source->height,app.rotation==1?6:app.rotation==2?3:app.rotation==3?8:1);
+ PhotoEditorStyle style{ui::background.ToCOLORREF(),ui::surface.ToCOLORREF(),ui::text.ToCOLORREF(),ui::muted.ToCOLORREF(),ui::accent.ToCOLORREF(),app.preferences.radius,app.preferences.animations};auto result=showPhotoEditor(app.window,source,app.files[app.index],style);if(result.picture){app.undo.push_back({app.picture,app.rotation,app.mirrored});trimHistory(app.undo);app.redo.clear();app.picture=app.savedPicture=result.picture;app.rotation=0;app.mirrored=false;app.lastExport=result.saved;app.exportNotice=true;app.fit=true;app.rebuildLibrary();}app.editing=false;}}break;
     case SaveEdits:command(Export);return;
     case Minimize:ShowWindow(app.window,SW_MINIMIZE);return;
     case Maximize:ShowWindow(app.window,IsZoomed(app.window)?SW_RESTORE:SW_MAXIMIZE);return;
@@ -1659,6 +1661,7 @@ int selfTest(const fs::path& report) {
             paf::EditOptions crop;crop.cropW=1;crop.cropH=1;queueEdit(crop);pump();success &=check(app.picture&&app.picture->width==1&&app.picture->height==1,"Editor crop changes actual raster dimensions");paf::EditOptions resize;resize.width=2;resize.height=3;queueEdit(resize);pump();success &=check(app.picture&&app.picture->width==2&&app.picture->height==3,"Editor resize processes pixels in background");
             auto editOutput=outputs/L"edited-copy.png";bool editSaved=app.exportCopy(editOutput,ExportFormat::PNG);pump();auto editDecoded=wicLoad(editOutput);success &=check(editSaved&&editDecoded.image&&editDecoded.image->width==2&&editDecoded.image->height==3&&updateHash(contextPath)==sourceHash,"Saved edited copy decodes correctly and original remains unchanged");
             success &=check(!(GetWindowLongW(window,GWL_STYLE)&WS_CAPTION),"Custom window frame has no duplicate native caption buttons");
+            success &=check(photoEditorSelfTest(window),"Full photo editor: adjustments, undo, crop, brush, background removal, thumbnails and actual PNG export");
             success &=check(paf::resizeDialogSelfTest(window),"Resize dialog locks aspect ratio, rejects invalid sizes and accepts exact pixel dimensions");
             command(Edit);command(DecoderPage);success &=check(app.decoderPage&&!IsWindowVisible(app.viewport)&&IsWindowVisible(app.controls[InstallCodecs].window),"Decoder sidebar opens package management without overlapping gallery viewport");success &=check(IsWindowEnabled(app.controls[InstallCodecs].window),"Decoder pack installation remains actionable when codecs are already available");command(Gallery);
             auto originalLanguage=app.preferences.language;

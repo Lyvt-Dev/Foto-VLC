@@ -4,7 +4,7 @@ Ein kleiner, nativer Foto-Betrachter für **Windows 10/11 x64**, geschrieben in
 C++17. Galerie mit Suche und Favoriten, deutsche und englische Oberfläche,
 System-/Hell-/Dunkel-Design, keine Browser-Runtime und kein Account.
 
-> **PAF-Photos 0.7.1** ist eine Galerie und ein Foto-Betrachter. Die Unterstützung für jedes
+> **PAF-Photos 0.7.2** ist eine Galerie und ein Foto-Betrachter. Die Unterstützung für jedes
 > Design-, CAD- oder Spieleformat ist noch nicht vollständig. Alle 197 erfassten Endungen sind im
 > Dateifilter erfasst; die tatsächliche Unterstützung steht in
 > [docs/formats.md](docs/formats.md).
@@ -51,6 +51,7 @@ signiert. Die Prüfsumme steht im jeweiligen Release.
 - Kompakte Werkzeugleiste, native Windows-Schaltflächen und Hinweise beim Darüberfahren.
 - Anpassen, Originalgröße, Zoom auf die Mausposition und Verschieben durch Ziehen.
 - Doppelklick wechselt zwischen angepasster Ansicht und Originalgröße.
+- Neuer Editor: Zuschneiden mit Griffen und Begradigen, zehn Licht-/Farbregler, 15 Filtervorschauen, Zeichnen, lokale Retusche und farbbasierte Hintergrundbearbeitung. Alle Bildoperationen laufen offline.
 - In 90°-Schritten drehen, Vollbild, Diashow mit vier Sekunden pro Bild.
 - Bilddetails bei Bedarf einblenden: Dateiname, Format, Größe, Auflösung und Änderungsdatum.
 - Datei im Explorer anzeigen oder ihren Pfad kopieren.
@@ -65,7 +66,7 @@ signiert. Die Prüfsumme steht im jeweiligen Release.
 
 Bearbeitung und Export lassen Originaldateien unverändert. Nur die ausdrücklich ausgewählten Aktionen im Galerie-Löschmenü löschen Dateien vom PC.
 GIFs, APNGs und mehrseitige Dateien zeigen die erste decodierbare Seite; Animation
-und Ebenenbearbeitung gehören nicht zu v0.5. Die Diashow wechselt zwischen Dateien.
+und Ebenenbearbeitung gehören nicht zu v0.7.2. Die Diashow wechselt zwischen Dateien.
 
 ## Bedienung
 

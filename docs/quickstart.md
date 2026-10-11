@@ -1,4 +1,4 @@
-# PAF-Photos 0.7.1
+# PAF-Photos 0.7.2
 
 A portable photo gallery and image viewer for Windows 10/11 (64-bit).
 
@@ -97,7 +97,15 @@ but application branding, shortcuts and executable names now use PAF-Photos.
 
 ## Edit a photo
 
-Open a photo and select **Edit / Bearbeiten** (E). Crop uses a centered aspect-ratio selection; Resize opens width/height fields in pixels, a live dimension summary and an aspect-ratio lock. It can enlarge or reduce the actual image. Unlock the ratio to enter independent dimensions (1–16384 pixels each, up to 32 megapixels). Adjust brightness, contrast and saturation or choose Black & white / Sepia. Ctrl+Z undoes and Ctrl+Y redoes a change. Original restores the loaded photo. **Save copy** opens the export format and destination choices. Editing runs in the background; changes are kept in memory until exported.
+Open a photo and select **Edit / Bearbeiten** (E). The photo opens in a dedicated workspace with your app theme, accent color and corner radius.
+
+- **Crop:** drag the image handles, choose Free or a locked aspect ratio, straighten with the angle slider, rotate or flip, then Apply. Resize accepts exact pixel dimensions, with an optional aspect-ratio lock.
+- **Adjust:** use the brightness, exposure, contrast, highlights, shadows, vignette, saturation, warmth, tint and sharpness sliders. Scroll the right panel to reach the color and detail controls. Arrow keys adjust a focused slider.
+- **Filters:** choose among 15 previews of your own photo, or Auto enhance. Original removes the current filter selection; Reset restores the initial photo.
+- **Draw / Retouch:** use pen, highlighter, drawing eraser, brush size and color, or the retouch brush. The drawing eraser restores the underlying photo; retouch uses nearby image pixels.
+- **Background:** blur, remove to transparency, or replace with a chosen color. Tolerance controls color-based selection. Use Remove/Keep brushes to correct the result and Reset background to return to the photo from before this tool. Complex scenes may need manual refinement; this is an offline color-based tool, not AI segmentation.
+
+Ctrl+Z undoes, Ctrl+Y redoes, and holding Space compares the original. **Save options** (Ctrl+S) chooses PNG, JPEG, BMP, TIFF or lossless WebP, then a destination. The original cannot be overwritten. Use **Show in folder** to find the saved copy. Cancel/Done returns to the viewer and warns about unsaved changes. PNG, TIFF and WebP preserve transparency; JPEG/BMP use a white background. Edits work on the decoded raster, not RAW sensor data or project layers.
 
 ## Gallery context menu
 
