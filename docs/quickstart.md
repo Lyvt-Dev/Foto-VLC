@@ -1,4 +1,4 @@
-# Photo VLC 0.3.0
+# Photo VLC 0.4.0
 
 A portable photo gallery and image viewer for Windows 10/11 (64-bit).
 
@@ -29,12 +29,40 @@ Toggle favorites. You can also use the heart while viewing a photo.
 The sidebar shows your favorites; Sort reverses filename order and the grid
 button changes thumbnail size. Scroll to browse more images.
 
+## Convert and personalize
+
+Open a photo and choose **Convert** or press Ctrl+S. Select PNG, JPEG, BMP, TIFF or WebP
+in the Save dialog: Photo VLC actually encodes that format and sets its extension.
+The original cannot be overwritten. Rotation and mirroring are included.
+PNG/WebP preserve alpha; JPEG/BMP use white behind transparency. WebP is lossless.
+Export uses the decoded raster without source metadata or project layers. If a large
+file was downsampled, or has multiple frames/pages, a notice explains the limitation.
+
+Use **Settings** to choose any accent color, corner radius, animations, JPEG quality
+and whether gallery folders include their subfolders. Reduced-motion settings in
+Windows disable hover animations. Folder scanning is limited to 10,000 images.
+
+For installation, download **setup.exe**. It installs for your user without admin
+rights, creates a Start menu shortcut and offers an optional desktop shortcut.
+Uninstall through Windows Settings; your local preferences are retained.
+
+## Konvertieren und Anpassen
+
+Bild öffnen → **Konvertieren** oder Strg+S. PNG, JPEG, BMP, TIFF oder WebP auswählen.
+Das Bild wird als Kopie im gewählten Format gespeichert. Drehung und Spiegelung
+werden übernommen. PNG/WebP bewahren Transparenz, JPEG/BMP verwenden Weiß.
+Bei verkleinerten Vorschauen bzw. mehreren Bildern/Seiten erscheint ein Hinweis.
+Unter **Einstellungen** findest du Akzentfarbe, Eckenradius, Animationen,
+JPEG-Qualität und die optionale Suche in Unterordnern.
+`setup.exe` installiert die App ohne Administratorrechte; alternativ die ZIP entpacken.
+
 ## Viewing shortcuts
 
 - Ctrl+O: open image; Ctrl+Shift+O: open folder.
 - Left/Right: previous/next image; mouse wheel: zoom; drag: pan.
 - F: fit; 1: actual size; double-click: switch between the two.
-- R: rotate; F11: fullscreen; Space: slideshow.
+- Ctrl+S: convert/save a copy; Ctrl+C: copy image to clipboard (white background).
+- M: mirror; R: rotate; F11: fullscreen; Space: slideshow.
 - I: details; T: filmstrip; F1: keyboard help.
 - Esc: close help/settings/fullscreen/slideshow or return to the gallery.
 - Tab / Shift+Tab: move focus; Enter: activate the focused button.

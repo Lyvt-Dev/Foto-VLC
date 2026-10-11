@@ -1,20 +1,18 @@
-Photo VLC 0.3.0 introduces a photo gallery and a Windows-inspired interface based on the supplied references.
+Photo VLC 0.4.0 adds a Windows installer, a distinct identity and real image conversion.
 
-- Renamed the application and Windows executable to **Photo VLC / PhotoVLC.exe**.
-- Gallery with real image previews, file-name/type search, folder import, natural sorting and three tile sizes.
-- Collapsible navigation, saved favorites and multiple-photo selection.
-- Settings with system/dark/light themes, German/English/system language and opening zoom preferences.
-- Complete German and English UI, including dialogs, tooltips, keyboard help and decoder errors. Language changes take effect immediately.
-- Fixed button background painting with buffered rendering; consistent hover, pressed, selected and keyboard-focus states.
-- Added a built-in WebP decoder, including first-frame preview for animated WebP.
-- The portable ZIP includes additional codecs: verified AVIF, HEIC, JPEG XL, JPEG 2000, EXR, DDS and PCX decoding and previews, without manual installation.
-- Preserves gallery folders, favorites and preferences locally, and migrates settings from Foto VLC.
-- Visible version in the app, About screen and EXE properties.
+- Original cyan/violet aperture-P logo, a cool charcoal palette and flat buttons without bevels or toolbar shadows.
+- Choose any accent color, a 0–16 px corner radius and light/dark/system themes. Settings persist across restarts.
+- Smooth button hover animations; optional and respectful of Windows reduced-motion preferences.
+- **Convert** (Ctrl+S): save a copy as PNG, JPEG, BMP, TIFF or lossless WebP. Output extension follows the selected encoder. JPEG quality is configurable; PNG/WebP preserve transparency, JPEG/BMP use a white background.
+- Horizontal mirror (M), reset view and copy the transformed image to the clipboard (Ctrl+C, white background).
+- Conversion includes rotation and mirroring and refuses to overwrite the source. Large decoded previews and animation/multipage exports show a notice: only the displayed raster / first frame is exported, without project layers or source metadata.
+- Optional subfolder scanning (up to 10,000 gallery images, no traversal of directory links).
+- German and English interface and installer; visible version information.
 
-**Download PhotoVLC-Windows-x64.zip** for the complete portable application with additional codecs and license documentation. Extract it and start PhotoVLC.exe. The standalone PhotoVLC.exe is the smaller download and needs additional Windows codecs or ImageMagick for some formats.
+Download **setup.exe** for a per-user installation with codecs, Start menu shortcut, optional desktop shortcut and an Open With registration. No admin account is required. Default photo associations are not changed. Uninstall removes the app and its registration while preserving your preferences.
 
-Windows UI tests cover gallery search, selection, favorites, English/German switching, settings persistence, themes and 100/150/200% display scaling. Additional codec tests check real decoded pixels and gallery previews. Test reports and checksums are included with this release.
+**PhotoVLC-Windows-x64.zip** is the complete portable alternative. Extract the whole ZIP and launch PhotoVLC.exe; keep `codecs` beside it. The individual PhotoVLC.exe includes fewer decoders. Neither build is digitally signed.
 
-**Format boundaries:** 195 recognized file extensions (including all 194 requested extensions and EXR) do not mean 195 fully supported formats. Proprietary design/CAD projects and game containers remain dependent on available readers. RAW support depends on camera/model. PDF/EPS/PS need Ghostscript. Animations and multipage files currently show the first image. The EXE is not code-signed.
+Windows UI and conversion tests, actual codec pixel tests, silent install/uninstall checks and checksums accompany the release. Recognized extensions are not a promise that every proprietary project format can be decoded; see the format guide. Animation and multipage viewing still show the first frame/page.
 
-PhotoVLC-Codec-Sources.zip provides the corresponding source/build trees for the included third-party codec runtime; it is not needed to run Photo VLC.
+The optional **PhotoVLC-Codec-Sources.zip** contains corresponding source archives and license information for the bundled codec runtime; it is not needed to run the app.

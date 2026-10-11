@@ -4,7 +4,7 @@ Ein kleiner, nativer Foto-Betrachter für **Windows 10/11 x64**, geschrieben in
 C++17. Galerie mit Suche und Favoriten, deutsche und englische Oberfläche,
 System-/Hell-/Dunkel-Design, keine Browser-Runtime und kein Account.
 
-> **Photo VLC 0.3.0** ist eine Galerie und ein Foto-Betrachter. Die Unterstützung für jedes
+> **Photo VLC 0.4.0** ist eine Galerie und ein Foto-Betrachter. Die Unterstützung für jedes
 > Design-, CAD- oder Spieleformat ist noch nicht vollständig. Alle 194 Endungen sind im
 > Dateifilter erfasst; die tatsächliche Unterstützung steht in
 > [docs/formats.md](docs/formats.md).
@@ -19,6 +19,8 @@ Bildnachweise für die gezeigten Testfotos: [docs/screenshots.md](docs/screensho
 ## Download
 
 Unter [Releases](https://github.com/Lyvt-Dev/Foto-VLC/releases) gibt es
+`setup.exe` für eine Installation ohne Administratorrechte mit Codecs, Startmenü-Eintrag,
+optionalem Desktop-Symbol und „Öffnen mit“-Registrierung. Alternativ gibt es
 `PhotoVLC-Windows-x64.zip` als vollständige portable App mit zusätzlichen Decodern.
 ZIP vollständig entpacken und `PhotoVLC.exe` starten. Das `codecs`-Verzeichnis
 bleibt neben der EXE. Die einzelne `PhotoVLC.exe` ist der kleinere Download
@@ -27,6 +29,13 @@ C++-Runtime. Der Build ist bislang nicht mit einem Code-Signing-Zertifikat
 signiert. Die Prüfsumme steht im jeweiligen Release.
 
 ## Funktionen
+
+- Eigenes Blenden-P-Logo, flache Controls ohne Tiefeneffekt und dezente Hover-Animationen.
+- Frei wählbare Akzentfarbe, Eckenradius (0–16 px), Animationen und JPEG-Qualität.
+- Echte Konvertierung als Kopie: PNG, JPEG, BMP, TIFF und verlustfreies WebP (Strg+S).
+- Drehen und Spiegeln werden beim Export übernommen; Originaldateien können nicht überschrieben werden.
+- Bild in die Zwischenablage kopieren (Strg+C), spiegeln (M), Ansicht zurücksetzen.
+- Galerie optional mit Unterordnern (maximal 10.000 Bilder; Verzeichnislinks werden nicht verfolgt).
 
 - Datei oder Ordner öffnen; Dateien und Ordner per Drag-and-drop laden.
 - Filmstreifen mit echten Vorschaubildern und natürlicher Dateisortierung (Bild 2 vor Bild 10).
@@ -57,6 +66,8 @@ und Ebenenbearbeitung gehören nicht zu v0.3. Die Diashow wechselt zwischen Date
 
 | Aktion | Taste |
 | --- | --- |
+| Konvertieren / Bild kopieren | Strg+S / Strg+C |
+| Horizontal spiegeln | M |
 | Datei / Ordner öffnen | Strg+O / Strg+Umschalt+O |
 | Vorheriges / nächstes Bild | ← / → |
 | Einpassen / 1:1 | F / 1 |
@@ -167,3 +178,19 @@ Die Oberfläche verwendet native Windows-Schaltflächen mit zugänglichen Namen
 und Tastaturfokus. Eine vollständige Screenreader-Prüfung steht noch aus.
 
 [MIT-Lizenz](LICENSE) · [Drittanbieter-Lizenzen](THIRD_PARTY_NOTICES.md)
+
+## Konvertieren und Installer bauen
+
+„Konvertieren“ öffnet den Windows-Speicherdialog mit fünf echten Ausgabeformaten.
+Die Endung wird dem gewählten Format angepasst. PNG und WebP bewahren Transparenz;
+JPEG und BMP verwenden einen weißen Hintergrund. Exportiert wird das dekodierte Raster
+mit Drehung/Spiegelung, ohne Projekt-Ebenen oder Quell-Metadaten. Bei verkleinerten
+Vorschauen und Animationen/mehrseitigen Dateien weist die App auf die Pixelmaße
+beziehungsweise den Export des ersten Bildes hin. Der PNG/WebP-Export ist verlustfrei
+für das dekodierte Raster; eine JPEG-Quelldatei wird dabei nicht verlustfrei umcodiert.
+
+Der Release-Workflow baut `installer/PhotoVLC.iss` mit Inno Setup 6 aus demselben
+Payload wie die portable ZIP. Er prüft eine stille Installation, den installierten
+Codec-Pfad, die „Öffnen mit“-Registrierung und eine stille Deinstallation.
+Die Anwendung legt Einstellungen getrennt unter `%LOCALAPPDATA%\PhotoVLC` ab;
+diese bleiben bei der Deinstallation erhalten.

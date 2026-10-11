@@ -1,7 +1,7 @@
 # Abbildungen
 
 Galerie, dunkle/helle Einstellungen und Bildansicht sind echte App-Ansichten.
-Die Screenshots zeigen den tatsächlichen Windows-Build von Photo VLC 0.3.0
+Die Screenshots zeigen den tatsächlichen Windows-Build von Photo VLC 0.4.0
 unter Wine. Darstellung, Vorschaubilder und Bedienelemente stammen aus der App.
 
 Die gezeigten Bilddateien sind ausschließlich Demonstrationsmaterial; sie sind
@@ -17,3 +17,5 @@ nicht im App-Download enthalten.
   [CC BY 2.0](https://creativecommons.org/licenses/by/2.0/).
   Das Foto erscheint als skalierte Vorschau in der Galerie.
 - **Abendlicht**: eigens für dieses Projekt erstellte Testillustration, MIT-Lizenz.
+
+Photo VLC 0.4.0 uses an original generated cyan/violet aperture-P logo (`assets/logo.png`), licensed with this project under MIT. It is not a Microsoft Photos icon.

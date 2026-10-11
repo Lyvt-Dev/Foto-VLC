@@ -94,11 +94,43 @@ jobs:
           "$sum  PhotoVLC.exe" | Set-Content -Encoding ascii dist/SHA256SUMS.txt
           $zipSum = (Get-FileHash dist/PhotoVLC-Windows-x64.zip -Algorithm SHA256).Hash.ToLower()
           "$zipSum  PhotoVLC-Windows-x64.zip" | Add-Content -Encoding ascii dist/SHA256SUMS.txt
+      - name: Build and test Windows installer
+        shell: pwsh
+        run: |
+          $version = [regex]::Match((Get-Content CMakeLists.txt -Raw), 'project\(PhotoVLC VERSION ([0-9.]+)').Groups[1].Value
+          $payload = Join-Path $pwd 'dist/package'
+          $compiler = 'C:/Program Files (x86)/Inno Setup 6/ISCC.exe'
+          if (!(Test-Path $compiler)) { throw 'Inno Setup compiler is missing from the Windows runner' }
+          & $compiler "/DAppVersion=$version" "/DPayloadDir=$payload" installer/PhotoVLC.iss
+          if ($LASTEXITCODE -ne 0) { throw 'Installer compilation failed' }
+          $destination = Join-Path $pwd 'build/installer-test'
+          $install = Start-Process dist/setup.exe -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=`"$destination`"") -Wait -PassThru
+          if ($install.ExitCode -ne 0) { throw 'Silent installation failed' }
+          foreach ($file in @('PhotoVLC.exe', 'codecs/magick.exe', 'LICENSE', 'THIRD_PARTY_NOTICES.md', 'unins000.exe')) {
+            if (!(Test-Path (Join-Path $destination $file))) { throw "Missing installed file: $file" }
+          }
+          if (!(Test-Path 'HKCU:/Software/Classes/Applications/PhotoVLC.exe/shell/open/command')) { throw 'Open With registration missing' }
+          $report = Join-Path $pwd 'dist/installer-self-test.txt'
+          $codecReport = Join-Path $pwd 'build/installed-codec-test.txt'
+          $fixtures = Join-Path $pwd 'tests/fixtures'
+          $check = Start-Process (Join-Path $destination 'PhotoVLC.exe') -ArgumentList @('--codec-test', $fixtures, $codecReport) -Wait -PassThru
+          if ($check.ExitCode -ne 0) { throw 'Installed codec runtime failed' }
+          $uninstall = Start-Process (Join-Path $destination 'unins000.exe') -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART') -Wait -PassThru
+          if ($uninstall.ExitCode -ne 0) { throw 'Silent uninstall failed' }
+          # Inno's uninstaller loader can finish briefly before its worker exits.
+          for ($attempt = 0; $attempt -lt 40 -and (Test-Path (Join-Path $destination 'PhotoVLC.exe')); $attempt++) { Start-Sleep -Milliseconds 250 }
+          if (Test-Path (Join-Path $destination 'PhotoVLC.exe')) { throw 'Uninstall left the application executable' }
+          if (Test-Path 'HKCU:/Software/Classes/Applications/PhotoVLC.exe') { throw 'Uninstall left Open With registration' }
+          'PASS silent installation, payload, Open With registration, installed codecs, uninstall and registry cleanup' | Set-Content $report
+          $setupSum = (Get-FileHash dist/setup.exe -Algorithm SHA256).Hash.ToLower()
+          "$setupSum  setup.exe" | Add-Content -Encoding ascii dist/SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
           name: PhotoVLC-Windows-x64
           path: |
             dist/PhotoVLC.exe
+            dist/setup.exe
+            dist/installer-self-test.txt
             dist/PhotoVLC-Windows-x64.zip
             dist/SHA256SUMS.txt
             dist/windows-self-test.txt
@@ -122,5 +154,5 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "$GITHUB_REF_NAME" \
-            dist/PhotoVLC.exe dist/PhotoVLC-Windows-x64.zip dist/PhotoVLC-Codec-Sources.zip dist/SHA256SUMS.txt dist/windows-self-test.txt dist/codec-self-test.txt \
+            dist/PhotoVLC.exe dist/setup.exe dist/installer-self-test.txt dist/PhotoVLC-Windows-x64.zip dist/PhotoVLC-Codec-Sources.zip dist/SHA256SUMS.txt dist/windows-self-test.txt dist/codec-self-test.txt \
             --verify-tag --title "Photo VLC $GITHUB_REF_NAME" --notes-file docs/release-notes.md

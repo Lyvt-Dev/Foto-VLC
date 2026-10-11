@@ -1,6 +1,7 @@
 #include <windows.h>
 #include "version.h"
 2 ICON "app.ico"
+10 RCDATA "logo.png"
 3 RCDATA "../third_party/stb/LICENSE"
 4 RCDATA "../third_party/nanosvg/LICENSE.txt"
 6 RCDATA "../third_party/libwebp/COPYING"
