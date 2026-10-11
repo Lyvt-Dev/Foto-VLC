@@ -102,6 +102,16 @@ jobs:
           "$sum  PAFPhotos.exe" | Set-Content -Encoding ascii dist/SHA256SUMS.txt
           $zipSum = (Get-FileHash dist/PAFPhotos-Windows-x64.zip -Algorithm SHA256).Hash.ToLower()
           "$zipSum  PAFPhotos-Windows-x64.zip" | Add-Content -Encoding ascii dist/SHA256SUMS.txt
+      - name: Package optional decoder download
+        shell: pwsh
+        run: |
+          Copy-Item THIRD_PARTY_NOTICES.md build/Release/codecs/PAF-NOTICES.md
+          Compress-Archive -Path build/Release/codecs/* -DestinationPath dist/PAFPhotos-Decoders-x64.zip
+          $version = [regex]::Match((Get-Content CMakeLists.txt -Raw), 'project\(PAFPhotos VERSION ([0-9.]+)').Groups[1].Value
+          $sum = (Get-FileHash dist/PAFPhotos-Decoders-x64.zip -Algorithm SHA256).Hash.ToLower()
+          "$sum  PAFPhotos-Decoders-x64.zip" | Add-Content -Encoding ascii dist/SHA256SUMS.txt
+          $manifest = [ordered]@{version=$version;sha256=$sum;size=(Get-Item dist/PAFPhotos-Decoders-x64.zip).Length}
+          $manifest | ConvertTo-Json -Compress | Set-Content -Encoding ascii dist/decoders.json
       - name: Build and test Windows installer
         shell: pwsh
         run: |
@@ -179,6 +189,8 @@ jobs:
             dist/PAFPhotos.exe
             dist/setup.exe
             dist/update.json
+            dist/decoders.json
+            dist/PAFPhotos-Decoders-x64.zip
             dist/updater-self-test.txt
             dist/installer-self-test.txt
             dist/PAFPhotos-Windows-x64.zip
@@ -204,7 +216,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "$GITHUB_REF_NAME" \
-            dist/PAFPhotos.exe dist/setup.exe dist/update.json dist/updater-self-test.txt dist/installer-self-test.txt dist/PAFPhotos-Windows-x64.zip dist/PAFPhotos-Codec-Sources.zip dist/SHA256SUMS.txt dist/windows-self-test.txt dist/codec-self-test.txt \
+            dist/PAFPhotos.exe dist/setup.exe dist/update.json dist/decoders.json dist/PAFPhotos-Decoders-x64.zip dist/updater-self-test.txt dist/installer-self-test.txt dist/PAFPhotos-Windows-x64.zip dist/PAFPhotos-Codec-Sources.zip dist/SHA256SUMS.txt dist/windows-self-test.txt dist/codec-self-test.txt \
             --verify-tag --title "PAF-Photos $GITHUB_REF_NAME" --notes-file docs/release-notes.md
 
   published-update:
@@ -225,3 +237,8 @@ jobs:
           if (Test-Path $report) { Get-Content $report; Get-Content $report | Where-Object { $_ -match '^FAIL' } | ForEach-Object { Write-Output "::error::$_" } }
           if ($check.ExitCode -ne 0) { throw "Published HTTPS updater failed: $($check.ExitCode)" }
           gh release upload $env:GITHUB_REF_NAME $report --repo $env:GITHUB_REPOSITORY --clobber
+          $decoderReport = Join-Path $pwd 'published-decoder-self-test.txt'
+          $decoderCheck = Start-Process ./PAFPhotos.exe -ArgumentList @('--decoder-install-test', "`"$decoderReport`"") -Wait -PassThru
+          if (Test-Path $decoderReport) { Get-Content $decoderReport; Get-Content $decoderReport | Where-Object { $_ -match '^FAIL' } | ForEach-Object { Write-Output "::error::$_" } }
+          if ($decoderCheck.ExitCode -ne 0) { throw "Published decoder installation failed: $($decoderCheck.ExitCode)" }
+          gh release upload $env:GITHUB_REF_NAME $decoderReport --repo $env:GITHUB_REPOSITORY --clobber

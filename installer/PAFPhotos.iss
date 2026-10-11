@@ -1,6 +1,6 @@
-; Build: ISCC /DAppVersion=0.6.1 /DPayloadDir=<absolute dist/package> PAFPhotos.iss
+; Build: ISCC /DAppVersion=0.7.0 /DPayloadDir=<absolute dist/package> PAFPhotos.iss
 #ifndef AppVersion
-  #define AppVersion "0.6.1"
+  #define AppVersion "0.7.0"
 #endif
 #ifndef PayloadDir
   #define PayloadDir "..\dist\package"

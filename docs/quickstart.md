@@ -1,4 +1,4 @@
-# PAF-Photos 0.6.1
+# PAF-Photos 0.7.0
 
 A portable photo gallery and image viewer for Windows 10/11 (64-bit).
 
@@ -94,3 +94,15 @@ install on exit. Turn this off in Settings, or use Check for updates / Install n
 Portable apps open the release page to download updates. Coming from 0.4.0? Run the
 new setup once; older versions cannot update automatically. The P logo is retained,
 but application branding, shortcuts and executable names now use PAF-Photos.
+
+## Edit a photo
+
+Open a photo and select **Edit / Bearbeiten** (E). Crop uses a centered aspect-ratio selection; Resize keeps the aspect ratio. Adjust brightness, contrast and saturation or choose Black & white / Sepia. Ctrl+Z undoes and Ctrl+Y redoes a change. Original restores the loaded photo. **Save copy** opens the export format and destination choices. Editing runs in the background; changes are kept in memory until exported.
+
+## Gallery context menu
+
+Right-click a thumbnail (or press Shift+F10 while it is focused) to toggle its favorite state, remove it from the gallery, move it to the Windows Recycle Bin, or permanently delete it. Removing from the gallery keeps the file on disk. Use the gallery More menu to restore hidden images. Permanent deletion requires confirmation and bypasses the Recycle Bin.
+
+## Install decoders
+
+Choose **Decoders / Decoder** in the sidebar. The single EXE includes PCX, DDS (RGB/DXT1/3/5), Netpbm/PAM, SGI, XBM and HDR in addition to existing native formats. Install the optional decoder pack for AVIF, HEIC, JPEG XL, JPEG 2000, EXR and further supported variants. The app verifies the release download before installing it under your LocalAppData folder. The full setup and portable ZIP already include the additional runtime. Proprietary projects and formats that need other delegates are still subject to the format guide.

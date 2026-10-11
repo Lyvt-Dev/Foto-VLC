@@ -4,8 +4,8 @@ Ein kleiner, nativer Foto-Betrachter für **Windows 10/11 x64**, geschrieben in
 C++17. Galerie mit Suche und Favoriten, deutsche und englische Oberfläche,
 System-/Hell-/Dunkel-Design, keine Browser-Runtime und kein Account.
 
-> **PAF-Photos 0.6.1** ist eine Galerie und ein Foto-Betrachter. Die Unterstützung für jedes
-> Design-, CAD- oder Spieleformat ist noch nicht vollständig. Alle 195 erfassten Endungen sind im
+> **PAF-Photos 0.7.0** ist eine Galerie und ein Foto-Betrachter. Die Unterstützung für jedes
+> Design-, CAD- oder Spieleformat ist noch nicht vollständig. Alle 197 erfassten Endungen sind im
 > Dateifilter erfasst; die tatsächliche Unterstützung steht in
 > [docs/formats.md](docs/formats.md).
 
@@ -33,6 +33,9 @@ signiert. Die Prüfsumme steht im jeweiligen Release.
 - Eigenes Blenden-P-Logo, dezent erhabene Buttons mit sauberen Rundungen und weichen Hover-Übergängen.
 - Pixelgenaues Scrollen mit sanftem Abbremsen in Galerie und Einstellungen; kleine Touchpad-Bewegungen und Windows-Scroll-Vorgaben werden berücksichtigt.
 - Ein fester Scrollbereich hält teilweise sichtbare Karten und Buttons unterhalb der Überschrift; Fokusrahmen folgen dem eingestellten Eckenradius.
+- Rechtsklick auf Galeriebilder: Favoriten, aus der Galerie entfernen, Papierkorb oder endgültiges Löschen mit Bestätigung. Ausgeblendete Bilder lassen sich wieder anzeigen.
+- Bildbearbeitung im Hintergrund: mittiger Zuschnitt (1:1, 4:3, 16:9, 3:4), Verkleinern, Helligkeit, Kontrast, Sättigung, Schwarzweiß und Sepia. Rückgängig/Wiederholen und als Kopie speichern.
+- Decoder-Seite in der Sidebar: zusätzliches Paket direkt herunterladen und für den eigenen Benutzer installieren. Download mit SHA256-Prüfung, keine Administratorrechte nötig.
 - Frei wählbare Akzentfarbe, Eckenradius (0–16 px), Animationen und JPEG-Qualität.
 - Echte Konvertierung als Kopie: PNG, JPEG, BMP, TIFF und verlustfreies WebP (Strg+S).
 - Drehen und Spiegeln werden beim Export übernommen; Originaldateien können nicht überschrieben werden.
@@ -56,11 +59,11 @@ signiert. Die Prüfsumme steht im jeweiligen Release.
 - Transparenzraster, Unicode-Dateinamen und an die Display-Skalierung angepasste UI.
 - Bilder im Hintergrund laden; veraltete Ladeergebnisse werden verworfen.
 - PNG, JPEG/JFIF, BMP/DIB, GIF, TIFF, ICO über Windows WIC.
-- WebP (auch erste Animationsframes), SVG-Formen, PSD-Komposit, TGA, PGM/PPM, PIC und QOI über eingebettete Decoder.
+- WebP, SVG-Formen, PSD-Komposit, TGA, QOI, PIC, PCX/PCC, DDS (RGB/DXT1/3/5), PBM/PGM/PPM/PAM, SGI/RGB/RGBA/BW, XBM und HDR/RGBE über eingebettete Decoder.
 - Zusätzliche Decoder im vollständigen ZIP, automatisch erkannt: geprüfte AVIF-, HEIC-, JXL-, JP2-, EXR-, DDS- und PCX-Dateien einschließlich Galerie-Vorschau.
 - Weitere RAW-/Raster-/Vektorformate über das Decoder-Paket, abhängig von Variante und Kameramodell.
 
-Originaldateien werden nicht verändert. Drehen und Zoom betreffen nur die Anzeige.
+Bearbeitung und Export lassen Originaldateien unverändert. Nur die ausdrücklich ausgewählten Aktionen im Galerie-Löschmenü löschen Dateien vom PC.
 GIFs, APNGs und mehrseitige Dateien zeigen die erste decodierbare Seite; Animation
 und Ebenenbearbeitung gehören nicht zu v0.5. Die Diashow wechselt zwischen Dateien.
 

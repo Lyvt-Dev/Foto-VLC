@@ -2,6 +2,7 @@
 #include "i18n.hpp"
 #include "core.hpp"
 #include "decoders.hpp"
+#include "codec_pack.hpp"
 #include <fstream>
 #include <sstream>
 #include <cmath>
@@ -92,6 +93,7 @@ std::wstring magickPath() {
     wchar_t application[32768]{};
     DWORD appLength=GetModuleFileNameW(nullptr,application,32768);
     if(appLength&&appLength<32768){auto bundled=fs::path(application).parent_path()/L"codecs"/L"magick.exe";std::error_code ec;if(fs::is_regular_file(bundled,ec))return bundled.wstring();}
+    {auto user=userCodecDirectory()/L"magick.exe";std::error_code ec;if(!user.empty()&&fs::is_regular_file(user,ec))return user.wstring();}
     // Search PATH explicitly, excluding the working directory from executable lookup.
     wchar_t paths[32768]{};
     length=GetEnvironmentVariableW(L"PATH",paths,32768);
@@ -124,7 +126,7 @@ Decode load(const fs::path& path,unsigned maxEdge) {
     auto bundled=embeddedLoad(path);
     if(bundled.image)return bundled;
     auto exe=magickPath();
-    if(exe.empty()) return {{},native.error+tr(L"\nFür weitere Formate: ImageMagick 7 installieren und FOTO_VLC_MAGICK auf magick.exe setzen.\nDie Endung allein garantiert keinen Decoder; proprietäre Projekte können nicht verfügbar sein.")};
+    if(exe.empty()) return {{},native.error+tr(L"\nÖffne Decoder in der Seitenleiste, um weitere Formate freizuschalten. Proprietäre Projekte können weiterhin nicht verfügbar sein.")};
     TempDirectory temp;
     if(temp.path.empty()) return {{},tr(L"Temporärer Ordner konnte nicht erstellt werden.")};
     const auto output=temp.path/L"preview.bmp";

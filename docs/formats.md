@@ -1,8 +1,8 @@
-# Formatstatus in v0.3.0
+# Formatstatus in v0.7.0
 
-**Neu in 0.3.0:** WebP ist eingebaut. Im vollständigen ZIP wurden außerdem AVIF, HEIC, JXL, JP2, EXR, DDS und PCX mit echten Dateien und Galerie-Vorschaubildern geprüft. Weitere Varianten bleiben decoderabhängig.
+**Neu in 0.7.0:** PCX/PCC (8-Bit-Palette/RGB), DDS (RGB24/RGBA32 und DXT1/3/5), PBM/PGM/PPM/PAM, SGI/RGB/RGBA/BW (8-Bit raw/RLE), XBM und HDR/RGBE sind ohne zusätzliche Installation eingebaut. Das Decoder-Paket kann direkt über die Sidebar installiert werden. WebP ist ebenfalls eingebaut. Im vollständigen ZIP wurden außerdem AVIF, HEIC, JXL, JP2, EXR, DDS und PCX mit echten Dateien und Galerie-Vorschaubildern geprüft. Weitere Varianten bleiben decoderabhängig.
 
-Alle **194 unterschiedlichen Endungen** der Anfrage sowie zusätzlich **EXR** sind erfasst (195 insgesamt). Das vollständige ZIP enthält zusätzliche Decoder (siehe [codecs.md](codecs.md)). Die App prüft
+Alle **194 unterschiedlichen Endungen** der Anfrage sowie zusätzlich **EXR, HDR und RGBE** sind erfasst (197 insgesamt). Das vollständige ZIP enthält zusätzliche Decoder (siehe [codecs.md](codecs.md)). Die App prüft
 zuerst den Dateiinhalt mit Windows WIC, dann die eingebetteten Decoder und
 anschließend – sofern installiert – ImageMagick. Eine Endung ist kein Codec.
 
@@ -50,7 +50,7 @@ enthalten. `.emf+` bezeichnet oft Inhalt innerhalb einer EMF-Datei.
 | `.bntx` | Nicht nativ unterstützt; externer Decoder nicht zugesichert |
 | `.bpg` | Optional / nicht zugesichert: installierter WIC-Codec oder ImageMagick |
 | `.bti` | Nicht nativ unterstützt; externer Decoder nicht zugesichert |
-| `.bw` | Optional / nicht zugesichert: installierter WIC-Codec oder ImageMagick |
+| `.bw` | Eingebaut: SGI-Graustufen, 8-Bit raw/RLE |
 | `.cap` | Optional / nicht zugesichert: installierter WIC-Codec oder ImageMagick |
 | `.cdr` | Nicht nativ unterstützt; externer Decoder nicht zugesichert |
 | `.cdt` | Nicht nativ unterstützt; externer Decoder nicht zugesichert |
@@ -64,7 +64,7 @@ enthalten. `.emf+` bezeichnet oft Inhalt innerhalb einer EMF-Datei.
 | `.cut` | Optional / nicht zugesichert: installierter WIC-Codec oder ImageMagick |
 | `.dcr` | Optional / nicht zugesichert: installierter WIC-Codec oder ImageMagick |
 | `.dcx` | Optional / nicht zugesichert: installierter WIC-Codec oder ImageMagick |
-| `.dds` | Optional / nicht zugesichert: installierter WIC-Codec oder ImageMagick |
+| `.dds` | Eingebaut: RGB24/RGBA32 und DXT1/3/5; DX10/BC7 optional |
 | `.dib` | WIC (statisches erstes Bild) |
 | `.dng` | Optional / nicht zugesichert: installierter WIC-Codec oder ImageMagick |
 | `.dwg` | Nicht nativ unterstützt; externer Decoder nicht zugesichert |
@@ -146,25 +146,25 @@ enthalten. `.emf+` bezeichnet oft Inhalt innerhalb einer EMF-Datei.
 | `.ora` | Optional / nicht zugesichert: installierter WIC-Codec oder ImageMagick |
 | `.orf` | Optional / nicht zugesichert: installierter WIC-Codec oder ImageMagick |
 | `.ota` | Optional / nicht zugesichert: installierter WIC-Codec oder ImageMagick |
-| `.pam` | Optional / nicht zugesichert: installierter WIC-Codec oder ImageMagick |
-| `.pbm` | Optional / nicht zugesichert: installierter WIC-Codec oder ImageMagick |
-| `.pcc` | Optional / nicht zugesichert: installierter WIC-Codec oder ImageMagick |
+| `.pam` | Eingebaut: P7, Grau/RGB mit optionalem Alpha, 8/16-Bit |
+| `.pbm` | Eingebaut: ASCII P1 und binäres P4 |
+| `.pcc` | Eingebaut: PCX-Varianten, 8-Bit-Palette/RGB |
 | `.pcd` | Optional / nicht zugesichert: installierter WIC-Codec oder ImageMagick |
 | `.pct` | Optional / nicht zugesichert: installierter WIC-Codec oder ImageMagick |
-| `.pcx` | Optional / nicht zugesichert: installierter WIC-Codec oder ImageMagick |
+| `.pcx` | Eingebaut: 8-Bit-Palette/RGB, raw/RLE |
 | `.pdf` | Optional / nicht zugesichert: installierter WIC-Codec oder ImageMagick |
 | `.pdn` | Nicht nativ unterstützt; externer Decoder nicht zugesichert |
 | `.pef` | Optional / nicht zugesichert: installierter WIC-Codec oder ImageMagick |
 | `.pfm` | Optional / nicht zugesichert: installierter WIC-Codec oder ImageMagick |
-| `.pgm` | stb_image: binäres P5 |
+| `.pgm` | Eingebaut: P2/P5, bis 16-Bit |
 | `.pic` | stb_image: Softimage PIC, nicht jedes Format mit dieser Endung |
 | `.pict` | Optional / nicht zugesichert: installierter WIC-Codec oder ImageMagick |
 | `.pjp` | WIC (statisches erstes Bild) |
 | `.pjpeg` | WIC (statisches erstes Bild) |
 | `.plt` | Optional / nicht zugesichert: installierter WIC-Codec oder ImageMagick |
 | `.png` | WIC (statisches erstes Bild) |
-| `.pnm` | stb_image: binäres P5/P6 |
-| `.ppm` | stb_image: binäres P6 |
+| `.pnm` | Eingebaut: P1–P7 |
+| `.ppm` | Eingebaut: P3/P6, bis 16-Bit |
 | `.procreate` | Nicht nativ unterstützt; externer Decoder nicht zugesichert |
 | `.ps` | Optional / nicht zugesichert: installierter WIC-Codec oder ImageMagick |
 | `.psb` | Optional / nicht zugesichert: installierter WIC-Codec oder ImageMagick |
@@ -179,12 +179,12 @@ enthalten. `.emf+` bezeichnet oft Inhalt innerhalb einer EMF-Datei.
 | `.ras` | Optional / nicht zugesichert: installierter WIC-Codec oder ImageMagick |
 | `.raw` | Nicht nativ unterstützt; externer Decoder nicht zugesichert |
 | `.rd` | Nicht nativ unterstützt; externer Decoder nicht zugesichert |
-| `.rgb` | Optional / nicht zugesichert: installierter WIC-Codec oder ImageMagick |
-| `.rgba` | Optional / nicht zugesichert: installierter WIC-Codec oder ImageMagick |
+| `.rgb` | Eingebaut: SGI-Variante, 8-Bit raw/RLE |
+| `.rgba` | Eingebaut: SGI-Variante mit Alpha, 8-Bit raw/RLE |
 | `.rw1` | Optional / nicht zugesichert: installierter WIC-Codec oder ImageMagick |
 | `.rw2` | Optional / nicht zugesichert: installierter WIC-Codec oder ImageMagick |
 | `.rwl` | Optional / nicht zugesichert: installierter WIC-Codec oder ImageMagick |
-| `.sgi` | Optional / nicht zugesichert: installierter WIC-Codec oder ImageMagick |
+| `.sgi` | Eingebaut: 8-Bit raw/RLE, 1–4 Kanäle |
 | `.sketch` | Nicht nativ unterstützt; externer Decoder nicht zugesichert |
 | `.sr2` | Optional / nicht zugesichert: installierter WIC-Codec oder ImageMagick |
 | `.srf` | Optional / nicht zugesichert: installierter WIC-Codec oder ImageMagick |
@@ -219,7 +219,10 @@ enthalten. `.emf+` bezeichnet oft Inhalt innerhalb einer EMF-Datei.
 | `.wmf` | Optional / nicht zugesichert: installierter WIC-Codec oder ImageMagick |
 | `.wpg` | Optional / nicht zugesichert: installierter WIC-Codec oder ImageMagick |
 | `.x3f` | Optional / nicht zugesichert: installierter WIC-Codec oder ImageMagick |
-| `.xbm` | Optional / nicht zugesichert: installierter WIC-Codec oder ImageMagick |
+| `.xbm` | Eingebaut: X11-Bitmap, 8-Bit-C-Arrays |
 | `.xcf` | Optional / nicht zugesichert: installierter WIC-Codec oder ImageMagick |
 | `.xpm` | Optional / nicht zugesichert: installierter WIC-Codec oder ImageMagick |
 | `.xwd` | Optional / nicht zugesichert: installierter WIC-Codec oder ImageMagick |
+
+| `.hdr` | Eingebaut: Radiance RGBE, Darstellung als 8-Bit-Raster |
+| `.rgbe` | Eingebaut: Radiance RGBE, Darstellung als 8-Bit-Raster |

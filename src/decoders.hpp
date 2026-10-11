@@ -9,5 +9,6 @@ struct Raster {
     std::string engine,error;
     explicit operator bool()const{return !rgba.empty();}
 };
+Raster extraEmbedded(const std::vector<std::uint8_t>& data,const std::string& extension);
 Raster embedded(const std::vector<std::uint8_t>& data,const std::string& extension);
 }

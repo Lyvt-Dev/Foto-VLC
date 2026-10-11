@@ -16,6 +16,7 @@
 #define STBI_ONLY_TGA
 #define STBI_ONLY_PNM
 #define STBI_ONLY_PIC
+#define STBI_ONLY_HDR
 #define STBI_NO_STDIO
 #define STBI_MAX_DIMENSIONS 16384
 #include "../third_party/stb/stb_image.h"
@@ -90,6 +91,7 @@ Raster embedded(const std::vector<std::uint8_t>& data,const std::string& ext) {
         if(!raster)return fail("SVG rasterizer allocation failed");
         nsvgRasterize(raster.get(),image.get(),0,0,scale,r.rgba.data(),r.width,r.height,r.width*4);return r;
     }
+    if(ext=="pcx"||ext=="pcc"||ext=="pbm"||ext=="pam"||ext=="pgm"||ext=="ppm"||ext=="pnm"||ext=="sgi"||ext=="rgb"||ext=="rgba"||ext=="bw"||ext=="dds"||ext=="xbm")return extraEmbedded(data,ext);
     int width=0,height=0,channels=0;
     if(!stbi_info_from_memory(data.data(),int(data.size()),&width,&height,&channels))return fail("No embedded decoder for this file");
     if(width<=0||height<=0||std::uint64_t(width)*height>32000000)return fail("Raster exceeds 32 megapixel limit");

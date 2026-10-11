@@ -22,6 +22,8 @@ class UpdateService {
     void publish(UpdateSnapshot next);
 public:
     ~UpdateService(){stop();}
+    void prepareDownload(){stop();cancelled=false;}
+    bool download(const std::wstring& url,const fs::path& path,size_t maximum,std::string* text=nullptr){return fetch(url,path,maximum,text);}
     UpdateSnapshot snapshot();
     bool start(HWND window,UINT notification,const std::string& current,const fs::path& cache,bool download);
     void stop();
