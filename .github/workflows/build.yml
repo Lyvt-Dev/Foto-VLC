@@ -112,7 +112,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { Get-Content build/installer.log -Tail 10 | ForEach-Object { Write-Output "::error::$_" }; throw 'Installer compilation failed' }
           $destination = Join-Path $pwd 'build/installer-test'
           # Upgrade the last published Photo VLC installer before checking the new payload.
-          Invoke-WebRequest 'https://github.com/Lyvt-Dev/Photo-VLC/releases/download/v0.4.0/setup.exe' -OutFile build/previous-setup.exe
+          Invoke-WebRequest 'https://github.com/Lyvt-Dev/PAF-Photos/releases/download/v0.4.0/setup.exe' -OutFile build/previous-setup.exe
           if ((Get-FileHash build/previous-setup.exe -Algorithm SHA256).Hash.ToLower() -ne '9a0c3caac0507ecad4b7f4bbb0713b109049044a9b70171c41280edf4c4a78ab') { throw 'Previous installer checksum mismatch' }
           $previous = Start-Process build/previous-setup.exe -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=`"$destination`"") -Wait -PassThru
           if ($previous.ExitCode -ne 0) { throw 'Previous version installation failed' }

@@ -315,7 +315,7 @@ App app;
 void checkUpdates(bool manual=false){
     if(app.testing||app.settingsPath.empty())return;
     auto state=app.updates.snapshot();
-    if(manual&&state.phase==UpdatePhase::Available&&!app.installed){ShellExecuteW(app.window,L"open",L"https://github.com/Lyvt-Dev/Photo-VLC/releases/latest",nullptr,nullptr,SW_SHOWNORMAL);return;}
+    if(manual&&state.phase==UpdatePhase::Available&&!app.installed){ShellExecuteW(app.window,L"open",L"https://github.com/Lyvt-Dev/PAF-Photos/releases/latest",nullptr,nullptr,SW_SHOWNORMAL);return;}
     if(manual&&state.phase==UpdatePhase::Ready){
         if(!app.installed){ShellExecuteW(app.window,L"open",state.installer.c_str(),nullptr,nullptr,SW_SHOWNORMAL);return;}
         if(app.exporting){app.notice=tr(L"Bitte warte, bis die Konvertierung abgeschlossen ist.");refresh();return;}
@@ -1121,8 +1121,8 @@ void command(int id) {
         }break;
     case CopyPath:copyPath();break;
     case ClearRecent:app.preferences.recent.clear();app.rebuildLibrary();app.saveSettings();break;
-    case ReleasePage:ShellExecuteW(app.window,L"open",app.helpPage==2?L"https://github.com/Lyvt-Dev/Photo-VLC/blob/main/docs/formats.md":L"https://github.com/Lyvt-Dev/Photo-VLC/releases",nullptr,nullptr,SW_SHOWNORMAL);break;
-    case SourcePage:ShellExecuteW(app.window,L"open",L"https://github.com/Lyvt-Dev/Photo-VLC",nullptr,nullptr,SW_SHOWNORMAL);break;
+    case ReleasePage:ShellExecuteW(app.window,L"open",app.helpPage==2?L"https://github.com/Lyvt-Dev/PAF-Photos/blob/main/docs/formats.md":L"https://github.com/Lyvt-Dev/PAF-Photos/releases",nullptr,nullptr,SW_SHOWNORMAL);break;
+    case SourcePage:ShellExecuteW(app.window,L"open",L"https://github.com/Lyvt-Dev/PAF-Photos",nullptr,nullptr,SW_SHOWNORMAL);break;
     case ErrorDetails:MessageBoxW(app.window,app.error.c_str(),tr(L"Warum kann dieses Bild nicht geöffnet werden?"),MB_OK|MB_ICONINFORMATION);break;
     }
     refresh();

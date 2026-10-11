@@ -79,7 +79,7 @@ No account or telemetry is required. Removing a gallery folder does not delete
 its files. Clear the recent-image list in Settings.
 
 See **FORMATS.md** and **CODECS.md** for actual supported formats and limits.
-New versions: https://github.com/Lyvt-Dev/Photo-VLC/releases
+New versions: https://github.com/Lyvt-Dev/PAF-Photos/releases
 MIT license: LICENSE. Third-party terms: THIRD_PARTY_NOTICES.md and codecs/NOTICE.txt.
 
 Image conversion runs in the background; viewing controls stay responsive during encoding.

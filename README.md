@@ -18,7 +18,7 @@ Bildnachweise für die gezeigten Testfotos: [docs/screenshots.md](docs/screensho
 
 ## Download
 
-Unter [Releases](https://github.com/Lyvt-Dev/Photo-VLC/releases) gibt es
+Unter [Releases](https://github.com/Lyvt-Dev/PAF-Photos/releases) gibt es
 `setup.exe` für eine Installation ohne Administratorrechte mit Codecs, Startmenü-Eintrag,
 optionalem Desktop-Symbol und „Öffnen mit“-Registrierung. Alternativ gibt es
 `PAFPhotos-Windows-x64.zip` als vollständige portable App mit zusätzlichen Decodern.
@@ -211,7 +211,7 @@ Portable Apps zeigen verfügbare Versionen an und führen zum Release-Download.
 Für den Wechsel von 0.4.0 muss dieses Setup einmal manuell ausgeführt werden, da die
 alte Version noch keinen Updater besitzt. Der bisherige Installationsort wird übernommen.
 Das P-Logo bleibt erhalten; App, Setup, Verknüpfungen und EXE heißen jetzt PAF-Photos.
-Der Repository-Name bleibt aus Kompatibilitätsgründen Photo-VLC.
+Das Repository heißt ebenfalls PAF-Photos.
 
 Die App übermittelt für Updates nur HTTPS-Anfragen an GitHub und dessen Asset-Server;
 Bilder und Galeriepfade werden nicht übertragen. Prüfsummen schützen vor beschädigten

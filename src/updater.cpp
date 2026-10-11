@@ -51,7 +51,7 @@ bool UpdateService::start(HWND window,UINT notification,const std::string& curre
     worker=std::thread([this,current,cache,download]{
         try{
             std::string text;
-            if(!fetch(L"https://github.com/Lyvt-Dev/Photo-VLC/releases/latest/download/update.json",{},8192,&text))throw 1;
+            if(!fetch(L"https://github.com/Lyvt-Dev/PAF-Photos/releases/latest/download/update.json",{},8192,&text))throw 1;
             auto value=paf::manifest(text);if(!value)throw 1;
             if(!paf::newer(value->version,current)){publish({UpdatePhase::Current});running=false;return;}
             UpdateSnapshot result{UpdatePhase::Available,value->version,value->sha256,{}};
@@ -60,7 +60,7 @@ bool UpdateService::start(HWND window,UINT notification,const std::string& curre
             std::wstring version(value->version.begin(),value->version.end());auto destination=cache/(L"setup-"+version+L".exe");
             bool cached=fs::is_regular_file(destination,error)&&fs::file_size(destination,error)==value->size&&updateHash(destination)==value->sha256;
             if(!cached){auto part=fs::path(destination.wstring()+L".part");
-                bool received=fetch(L"https://github.com/Lyvt-Dev/Photo-VLC/releases/download/v"+version+L"/setup.exe",part,size_t(value->size));
+                bool received=fetch(L"https://github.com/Lyvt-Dev/PAF-Photos/releases/download/v"+version+L"/setup.exe",part,size_t(value->size));
                 bool valid=received&&fs::file_size(part,error)==value->size&&updateHash(part)==value->sha256;
                 if(!valid){fs::remove(part,error);throw 1;}if(!MoveFileExW(part.c_str(),destination.c_str(),MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH))throw 1;
             }
