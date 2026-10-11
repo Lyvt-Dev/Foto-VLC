@@ -55,7 +55,7 @@ struct Control {
     int id=0;
     foto::Box box;
     std::wstring caption,tip,accessible;
-    RenderBuffer buffer;RECT pixelBounds{},clipBounds{};bool clipped=false,wantsClip=false;
+    RenderBuffer buffer;RECT pixelBounds{},placementBounds{},clipBounds{};bool clipped=false,wantsClip=false;
     Icon icon=Icon::None;
     bool visible=false,enabled=true,active=false,primary=false;
     float hoverProgress=0;
@@ -138,6 +138,8 @@ void command(int id);
 void layoutControls();
 void drawButton(const DRAWITEMSTRUCT& item);
 LRESULT CALLBACK wndProc(HWND,UINT,WPARAM,LPARAM);
+LRESULT CALLBACK viewportProc(HWND,UINT,WPARAM,LPARAM,UINT_PTR,DWORD_PTR);
+void paintViewport(HWND);
 
 std::shared_ptr<Picture> thumbnail(const fs::path& path) {
     auto decoded=wicLoad(path,400);
@@ -157,7 +159,8 @@ std::shared_ptr<Picture> thumbnail(const fs::path& path) {
     graphics.DrawImage(&source,Rect(0,0,result->width,result->height));return result;
 }
 struct App {
-    HWND window=nullptr,tooltip=nullptr,search=nullptr;
+    HWND window=nullptr,tooltip=nullptr,search=nullptr,viewport=nullptr;
+    foto::Box viewportBox{};RenderBuffer viewportBuffer;
     HFONT searchFont=nullptr;
     bool gallery=true,favoritesView=false,settings=false,navExpanded=false,selectMode=false,reverseSort=false;
     paf::ScrollMotion galleryScroll,settingsScroll;
@@ -480,7 +483,7 @@ bool shortcut(UINT key) {
     return true;
 }
 bool motionEnabled(){BOOL enabled=TRUE;if(app.testing&&app.testMotion)enabled=*app.testMotion;else SystemParametersInfoW(SPI_GETCLIENTAREAANIMATION,0,&enabled,0);return app.preferences.animations&&enabled;}
-void animateButtons(){if(motionEnabled()){if(!app.hoverAnimating){app.hoverTime=std::chrono::steady_clock::now();app.hoverAnimating=true;SetTimer(app.window,4,16,nullptr);}}else{KillTimer(app.window,4);app.hoverAnimating=false;for(auto& entry:app.controls){entry.second.hoverProgress=app.hover==entry.first?1.0f:0.0f;if(entry.second.visible)InvalidateRect(entry.second.window,nullptr,FALSE);}}}
+void animateButtons(){if(motionEnabled()){if(!app.hoverAnimating){app.hoverTime=std::chrono::steady_clock::now();app.hoverAnimating=true;SetTimer(app.window,4,USER_TIMER_MINIMUM,nullptr);}}else{KillTimer(app.window,4);app.hoverAnimating=false;for(auto& entry:app.controls){entry.second.hoverProgress=app.hover==entry.first?1.0f:0.0f;if(entry.second.visible)InvalidateRect(entry.second.window,nullptr,FALSE);}}}
 Color blend(Color from,Color to,float progress){return Color(255,BYTE(from.GetR()+(to.GetR()-from.GetR())*progress),BYTE(from.GetG()+(to.GetG()-from.GetG())*progress),BYTE(from.GetB()+(to.GetB()-from.GetB())*progress));}
 LRESULT CALLBACK buttonProc(HWND window,UINT msg,WPARAM wp,LPARAM lp,UINT_PTR,DWORD_PTR id) {
     switch(msg) {
@@ -506,10 +509,31 @@ LRESULT CALLBACK buttonProc(HWND window,UINT msg,WPARAM wp,LPARAM lp,UINT_PTR,DW
     }
     return DefSubclassProc(window,msg,wp,lp);
 }
+float contentLeft();
+bool shellNavigation();
+bool scrollingControl(int id){
+    return app.helpPage<0&&((app.gallery&&id>=GalleryBase)||(app.settings&&(id==Theme||id==Language||id==DefaultZoom||id==TileInfo||id==Strip||id==RemoveFolder||id==ClearRecent||id==ReleasePage||(id>=Accent&&id<=CheckUpdates))));
+}
+void layoutViewport(){
+    auto l=viewLayout();bool visible=app.helpPage<0&&(app.settings||app.gallery);
+    if(!app.viewport){
+        // The native parent clips every scrolling child, including during window moves.
+        app.viewport=CreateWindowExW(WS_EX_CONTROLPARENT,L"STATIC",L"",WS_CHILD|WS_CLIPCHILDREN|WS_CLIPSIBLINGS,0,0,1,1,app.window,nullptr,GetModuleHandleW(nullptr),nullptr);
+        SetWindowSubclass(app.viewport,viewportProc,1,0);
+    }
+    float top=app.settings?170.0f:196.0f+(app.selectMode?66.0f:0.0f);
+    foto::Box box{contentLeft(),top,std::max(1.0f,l.width-contentLeft()),std::max(1.0f,l.height-36-top)};
+    app.viewportBox=box;float scale=app.dpi/96.0f;
+    RECT rect{};GetWindowRect(app.viewport,&rect);POINT origin{rect.left,rect.top};ScreenToClient(app.window,&origin);
+    int x=int(std::round(box.x*scale)),y=int(std::round(box.y*scale)),w=int(std::round((box.x+box.w)*scale))-x,h=int(std::round((box.y+box.h)*scale))-y;
+    if(origin.x!=x||origin.y!=y||rect.right-rect.left!=w||rect.bottom-rect.top!=h)SetWindowPos(app.viewport,nullptr,x,y,w,h,SWP_NOZORDER|SWP_NOACTIVATE|SWP_NOREDRAW);
+    if(bool(GetWindowLongW(app.viewport,GWL_STYLE)&WS_VISIBLE)!=visible)ShowWindow(app.viewport,visible?SW_SHOWNA:SW_HIDE);
+}
 void place(int id,foto::Box box,const std::wstring& caption,Icon icon=Icon::None,bool enabled=true,bool active=false,bool primary=false,const std::wstring& tip=L"") {
-    auto& c=app.controls[id];c.id=id;c.box=box;c.visible=true;c.enabled=enabled;c.active=active;c.primary=primary;c.icon=icon;
+    HWND parent=scrollingControl(id)?app.viewport:app.window;
+    auto& c=app.controls[id];bool reparented=c.window&&GetParent(c.window)!=parent;if(reparented)SetParent(c.window,parent);c.id=id;c.box=box;c.visible=true;c.enabled=enabled;c.active=active;c.primary=primary;c.icon=icon;
     if(!c.window) {
-        c.window=CreateWindowExW(0,L"BUTTON",caption.c_str(),WS_CHILD|WS_TABSTOP|BS_OWNERDRAW,0,0,1,1,app.window,reinterpret_cast<HMENU>(INT_PTR(id)),GetModuleHandleW(nullptr),nullptr);
+        c.window=CreateWindowExW(0,L"BUTTON",caption.c_str(),WS_CHILD|WS_TABSTOP|BS_OWNERDRAW,0,0,1,1,parent,reinterpret_cast<HMENU>(INT_PTR(id)),GetModuleHandleW(nullptr),nullptr);
         SetWindowSubclass(c.window,buttonProc,UINT_PTR(id),DWORD_PTR(id));
         TOOLINFOW tool{};tool.cbSize=sizeof(tool);tool.uFlags=TTF_IDISHWND|TTF_SUBCLASS;tool.hwnd=app.window;tool.uId=reinterpret_cast<UINT_PTR>(c.window);
         c.tip=tip.empty()?caption:tip;tool.lpszText=c.tip.data();SendMessageW(app.tooltip,TTM_ADDTOOLW,0,reinterpret_cast<LPARAM>(&tool));
@@ -521,8 +545,11 @@ void place(int id,foto::Box box,const std::wstring& caption,Icon icon=Icon::None
         SendMessageW(app.tooltip,TTM_UPDATETIPTEXTW,0,reinterpret_cast<LPARAM>(&tool));
     }
     float scale=app.dpi/96.0f;
-    RECT pixels{int(std::round(box.x*scale)),int(std::round(box.y*scale)),int(std::round(box.w*scale)),int(std::round(box.h*scale))};
-    if(!EqualRect(&pixels,&c.pixelBounds)){SetWindowPos(c.window,nullptr,pixels.left,pixels.top,pixels.right,pixels.bottom,SWP_NOZORDER|SWP_NOACTIVATE|SWP_NOREDRAW);c.pixelBounds=pixels;}
+    RECT pixels{int(std::round(box.x*scale)),int(std::round(box.y*scale)),int(std::round((box.x+box.w)*scale))-int(std::round(box.x*scale)),int(std::round((box.y+box.h)*scale))-int(std::round(box.y*scale))};
+    POINT offset{};if(parent==app.viewport)offset={int(std::round(app.viewportBox.x*scale)),int(std::round(app.viewportBox.y*scale))};
+    RECT placement{pixels.left-offset.x,pixels.top-offset.y,pixels.right,pixels.bottom};
+    if(reparented||!EqualRect(&placement,&c.placementBounds)){SetWindowPos(c.window,nullptr,placement.left,placement.top,placement.right,placement.bottom,SWP_NOZORDER|SWP_NOACTIVATE|SWP_NOREDRAW);c.placementBounds=placement;}
+    c.pixelBounds=pixels;
     if(bool(IsWindowEnabled(c.window))!=enabled)EnableWindow(c.window,enabled);
     if(!(GetWindowLongW(c.window,GWL_STYLE)&WS_VISIBLE))ShowWindow(c.window,SW_SHOWNA);
 }
@@ -556,7 +583,7 @@ void layoutControls() {
     if(!app.window)return;
     for(auto& entry:app.controls){entry.second.visible=false;entry.second.wantsClip=false;}
     auto l=viewLayout();float w=l.width;bool file=!app.gallery&&!app.settings&&!app.files.empty(),viewer=file&&app.helpPage<0,loaded=bool(app.picture)&&!app.busy;
-    layoutShell();
+    layoutShell();layoutViewport();
     if(app.helpPage>=0) {
         place(CloseHelp,{24,78,112,34},tr(L"Zurück"),Icon::Left);
         float x=std::max(contentLeft(),(w-800)/2),y=198;
@@ -683,7 +710,8 @@ void drawButton(const DRAWITEMSTRUCT& item) {
         if(pressed)g.TranslateTransform(0,1);
         if(c.id==Accent){ui::round(g,ui::accent,{12,(h-18)/2,18,18},9);ui::label(g,c.caption,{40,0,w-48,h},14,fg);}
         else {
-        bool iconOnly=c.icon!=Icon::None&&w<=48;
+        bool collapsedNavigation=shellNavigation()&&!app.navExpanded&&(c.id==NavToggle||c.id==Gallery||c.id==Favorites||c.id==OpenFolder||c.id==About);
+        bool iconOnly=c.icon!=Icon::None&&(w<=48||collapsedNavigation);
         if(iconOnly)ui::icon(g,c.icon,(w-19)/2,(h-19)/2,fg,19);
         else if(c.icon!=Icon::None) {
             ui::icon(g,c.icon,12,(h-18)/2,fg,18);
@@ -807,8 +835,8 @@ void drawViewer(Graphics& g,const foto::ViewerLayout& l) {
     }
     if(app.info)drawInspector(g,l);
 }
-void drawGallery(Graphics&,const foto::ViewerLayout&);
-void drawSettings(Graphics&,const foto::ViewerLayout&);
+void drawGallery(Graphics&,const foto::ViewerLayout&,bool=true);
+void drawSettings(Graphics&,const foto::ViewerLayout&,bool=true);
 void drawShell(Graphics&,const foto::ViewerLayout&);
 void paint(HWND window) {
     PAINTSTRUCT ps;HDC dc=BeginPaint(window,&ps);RECT bounds{};GetClientRect(window,&bounds);
@@ -818,7 +846,7 @@ void paint(HWND window) {
         Graphics g(memory);float scale=app.dpi/96.0f;g.ScaleTransform(scale,scale);g.SetSmoothingMode(SmoothingModeAntiAlias);g.SetTextRenderingHint(TextRenderingHintClearTypeGridFit);
         auto l=viewLayout();float w=l.width,h=l.height;g.SetClip(RectF(ps.rcPaint.left/scale,ps.rcPaint.top/scale,(ps.rcPaint.right-ps.rcPaint.left)/scale,(ps.rcPaint.bottom-ps.rcPaint.top)/scale));bool contentOnly=ps.rcPaint.top>=170*scale&&ps.rcPaint.bottom<=(h-28)*scale;ui::fill(g,ui::background,{0,0,w,h});ui::fill(g,ui::surface,{0,0,w,64});
         if(!contentOnly)drawShell(g,l);
-        if(app.helpPage>=0)drawHelp(g,l);else if(app.settings)drawSettings(g,l);else if(app.gallery||app.files.empty())drawGallery(g,l);else {drawViewer(g,l);if(app.exportNotice){auto panel=exportNoticeBox();ui::round(g,ui::surface,panel);ui::icon(g,Icon::Check,panel.x+18,panel.y+15,ui::accent,22);
+        if(app.helpPage>=0)drawHelp(g,l);else if(app.settings)drawSettings(g,l,!IsWindowVisible(app.viewport));else if(app.gallery||app.files.empty())drawGallery(g,l,!IsWindowVisible(app.viewport));else {drawViewer(g,l);if(app.exportNotice){auto panel=exportNoticeBox();ui::round(g,ui::surface,panel);ui::icon(g,Icon::Check,panel.x+18,panel.y+15,ui::accent,22);
             ui::label(g,tr(L"Kopie gespeichert"),{panel.x+50,panel.y+10,panel.w-94,30},16,ui::text,true);
             ui::label(g,app.lastExport.wstring(),{panel.x+18,panel.y+42,panel.w-36,34},12,ui::muted,false,false,true);}}
         if(!contentOnly){ui::fill(g,ui::line,{0,h-28,w,1});
@@ -832,6 +860,25 @@ void paint(HWND window) {
         ui::label(g,std::wstring(L"PAF-Photos " FOTO_VERSION_WSTRING)+tr(L"   ·   F1 Hilfe"),{w-230,h-27,210,26},10,ui::faint,false,true);}
     }
     if(memory!=dc)BitBlt(dc,0,0,bounds.right,bounds.bottom,memory,0,0,SRCCOPY);EndPaint(window,&ps);
+}
+void paintViewport(HWND window){
+    PAINTSTRUCT ps{};HDC dc=BeginPaint(window,&ps);RECT bounds{};GetClientRect(window,&bounds);
+    if(bounds.right>0&&bounds.bottom>0){HDC memory=app.viewportBuffer.prepare(dc,bounds.right,bounds.bottom);if(!memory)memory=dc;
+        {Graphics g(memory);float scale=app.dpi/96.0f;g.ScaleTransform(scale,scale);g.TranslateTransform(-std::round(app.viewportBox.x*scale)/scale,-std::round(app.viewportBox.y*scale)/scale);
+        g.SetSmoothingMode(SmoothingModeAntiAlias);g.SetTextRenderingHint(TextRenderingHintClearTypeGridFit);
+        g.SetClip(RectF(app.viewportBox.x,app.viewportBox.y,app.viewportBox.w,app.viewportBox.h));ui::fill(g,ui::background,app.viewportBox);
+        if(app.settings)drawSettings(g,viewLayout());else drawGallery(g,viewLayout());}
+        if(memory!=dc)BitBlt(dc,0,0,bounds.right,bounds.bottom,memory,0,0,SRCCOPY);
+    }EndPaint(window,&ps);
+}
+LRESULT CALLBACK viewportProc(HWND window,UINT msg,WPARAM wp,LPARAM lp,UINT_PTR,DWORD_PTR){
+    switch(msg){
+    case WM_ERASEBKGND:return 1;
+    case WM_PAINT:paintViewport(window);return 0;
+    case WM_COMMAND:case WM_DRAWITEM:case WM_MOUSEWHEEL:return SendMessageW(app.window,msg,wp,lp);
+    case WM_LBUTTONDOWN:case WM_LBUTTONUP:case WM_MOUSEMOVE:{POINT point{GET_X_LPARAM(lp),GET_Y_LPARAM(lp)};MapWindowPoints(window,app.window,&point,1);return SendMessageW(app.window,msg,wp,MAKELPARAM(point.x,point.y));}
+    case WM_NCDESTROY:app.viewportBuffer.reset();RemoveWindowSubclass(window,viewportProc,1);break;
+    }return DefSubclassProc(window,msg,wp,lp);
 }
 float sidebarWidth(){return app.navExpanded?236.0f:64.0f;}
 float contentLeft(){return sidebarWidth()+48;}
@@ -858,9 +905,11 @@ void layoutShell(){
     float scale=app.dpi/96.0f;int fontHeight=int(16*scale);
     static int lastHeight=0;
     if(!app.searchFont||lastHeight!=fontHeight){if(app.searchFont)DeleteObject(app.searchFont);app.searchFont=CreateFontW(-fontHeight,0,0,0,FW_NORMAL,FALSE,FALSE,FALSE,DEFAULT_CHARSET,OUT_DEFAULT_PRECIS,CLIP_DEFAULT_PRECIS,CLEARTYPE_QUALITY,DEFAULT_PITCH,L"Segoe UI");lastHeight=fontHeight;SendMessageW(app.search,WM_SETFONT,reinterpret_cast<WPARAM>(app.searchFont),TRUE);}
-    SetWindowPos(app.search,nullptr,int(90*scale),int(22*scale),int((w-522)*scale),int(25*scale),SWP_NOZORDER|SWP_NOACTIVATE);
-    SendMessageW(app.search,EM_SETCUEBANNER,TRUE,reinterpret_cast<LPARAM>(tr(L"Dateinamen und Formate suchen")));
-    ShowWindow(app.search,navigation?SW_SHOWNA:SW_HIDE);
+    RECT searchBounds{};GetWindowRect(app.search,&searchBounds);POINT searchOrigin{searchBounds.left,searchBounds.top};ScreenToClient(app.window,&searchOrigin);
+    int sx=int(90*scale),sy=int(22*scale),sw=int((w-522)*scale),sh=int(25*scale);
+    if(searchOrigin.x!=sx||searchOrigin.y!=sy||searchBounds.right-searchBounds.left!=sw||searchBounds.bottom-searchBounds.top!=sh)SetWindowPos(app.search,nullptr,sx,sy,sw,sh,SWP_NOZORDER|SWP_NOACTIVATE);
+    static std::wstring cue;auto wantedCue=tr(L"Dateinamen und Formate suchen");if(cue!=wantedCue){cue=wantedCue;SendMessageW(app.search,EM_SETCUEBANNER,TRUE,reinterpret_cast<LPARAM>(cue.c_str()));}
+    if(bool(GetWindowLongW(app.search,GWL_STYLE)&WS_VISIBLE)!=navigation)ShowWindow(app.search,navigation?SW_SHOWNA:SW_HIDE);
 }
 void layoutGalleryControls(){
     auto l=viewLayout();float x=contentLeft(),w=l.width-x-42,top=152;
@@ -906,8 +955,8 @@ ScrollTrack scrollTrack(){auto l=viewLayout();ScrollTrack t;t.top=app.settings?1
     t.thumb=std::min(t.height,std::max(28.0f,float(t.height*t.height/(t.height+t.maximum))));
     double position=app.settings?app.settingsScroll.position:app.galleryScroll.position;
     t.position=t.top+(t.maximum>0?float(position/t.maximum)*(t.height-t.thumb):0);return t;}
-void redrawScroll(){layoutControls();auto l=viewLayout();float scale=app.dpi/96.0f;RECT dirty{LONG(contentLeft()*scale),LONG((app.settings?170:196+(app.selectMode?66:0))*scale),LONG(l.width*scale),LONG((l.height-36)*scale)};
-    RedrawWindow(app.window,&dirty,nullptr,RDW_INVALIDATE|RDW_NOERASE|RDW_ALLCHILDREN|RDW_UPDATENOW);}
+void redrawScroll(){layoutControls();RedrawWindow(app.viewport,nullptr,nullptr,RDW_INVALIDATE|RDW_NOERASE|RDW_ALLCHILDREN|RDW_UPDATENOW);}
+
 bool scrollFrame(double seconds){
     if(app.helpPage>=0||(!app.settings&&!app.gallery))return false;
     auto& motion=app.settings?app.settingsScroll:app.galleryScroll;
@@ -918,7 +967,7 @@ void scrollWheel(short delta){if(!delta)return;auto track=scrollTrack();UINT lin
     double distance=lines==WHEEL_PAGESCROLL?track.height*0.9:double(lines)*30;
     auto& motion=app.settings?app.settingsScroll:app.galleryScroll;motion.add(-double(delta)/WHEEL_DELTA*distance,track.maximum);
     if(!motionEnabled()){motion.reset(motion.target);redrawScroll();return;}
-    if(!app.scrollAnimating){app.motionTime=std::chrono::steady_clock::now();app.scrollAnimating=true;SetTimer(app.window,6,16,nullptr);}
+    if(!app.scrollAnimating){app.motionTime=std::chrono::steady_clock::now();app.scrollAnimating=true;SetTimer(app.window,6,USER_TIMER_MINIMUM,nullptr);}
 }
 void scrollDrag(float y){auto track=scrollTrack();double distance=y-track.top-app.scrollGrab,range=track.height-track.thumb;double fraction=range>0?(distance>=range-0.5?1.0:std::clamp(distance/range,0.0,1.0)):0;
     (app.settings?app.settingsScroll:app.galleryScroll).reset(fraction*track.maximum);redrawScroll();}
@@ -978,12 +1027,13 @@ void drawShell(Graphics& g,const foto::ViewerLayout& l){
         if(!app.files.empty())ui::label(g,app.files[app.index].filename().wstring(),{180,14,l.width-595,34},14,ui::muted,false,true);
     }
 }
-void drawGallery(Graphics& g,const foto::ViewerLayout& l){
+void drawGallery(Graphics& g,const foto::ViewerLayout& l,bool contents){
     float x=contentLeft(),w=l.width-x-42;ui::icon(g,app.favoritesView?Icon::Heart:Icon::Image,x,110,ui::text,26);
     ui::label(g,app.favoritesView?tr(L"Favoriten"):tr(L"Galerie"),{x+40,96,std::max(90.0f,app.controls[SelectMode].box.x-x-48),48},30,ui::text,true);
     auto count=std::to_wstring(app.filtered.size())+L" "+tr(L"Elemente");
     if(app.selectMode)count+=L" · "+std::to_wstring(app.selected.size())+L" "+tr(L"ausgewählt");
     ui::label(g,count,{x,151,w,26},16,ui::muted);
+    if(!contents)return;
     if(app.galleryMaxScroll>0&&!app.filtered.empty()){auto t=scrollTrack();ui::round(g,ui::faint,{l.width-10,t.position,3,t.thumb},1.5f);}
     if(app.filtered.empty()){
         float y=std::max(320.0f,l.height/2);ui::brand(g,x+w/2-36,y-96,72);
@@ -991,9 +1041,10 @@ void drawGallery(Graphics& g,const foto::ViewerLayout& l){
         ui::label(g,app.library.empty()?tr(L"Füge einen Bilderordner hinzu. Deine Fotos erscheinen dann hier."):app.favoritesView?tr(L"Markiere Fotos mit dem Herz, um sie hier wiederzufinden."):tr(L"Versuche einen anderen Dateinamen oder ein anderes Format."),{x,y+52,w,38},18,ui::muted,false,true,true);
     }
 }
-void drawSettings(Graphics& g,const foto::ViewerLayout& l){
+void drawSettings(Graphics& g,const foto::ViewerLayout& l,bool contents){
     float x=contentLeft(),w=std::min(850.0f,l.width-x-42);ui::icon(g,Icon::Settings,x,112,ui::text,28);
     ui::label(g,tr(L"Einstellungen"),{x+42,96,w-42,48},30,ui::text,true);
+    if(!contents)return;
     auto saved=g.Save();g.SetClip(RectF(x,170,w,l.height-206),CombineModeIntersect);
     const std::pair<float,const wchar_t*> sections[]={{164,tr(L"Personalisierung")},{890,tr(L"Bildbetrachtung")},{1232,tr(L"Bibliothek & Datenschutz")},{1576,tr(L"Über die App")}};
     for(const auto& section:sections){float y=section.first-float(app.settingsScroll.position);if(y+30>170&&y<l.height-36)ui::label(g,section.second,{x,y,w,30},18,ui::text,true);}
@@ -1343,7 +1394,8 @@ int selfTest(const fs::path& report) {
     bool success=hashCorrect&&tamperCorrect&&policyCorrect;
     auto fitsClient=[&](const Control& c,const RECT& client){RECT visible{};GetClientRect(c.window,&visible);HRGN region=CreateRectRgn(0,0,0,0);int kind=GetWindowRgn(c.window,region);
         if(kind!=ERROR)GetRgnBox(region,&visible);DeleteObject(region);RECT window{};GetWindowRect(c.window,&window);POINT origin{window.left,window.top};ScreenToClient(app.window,&origin);
-        return origin.x+visible.left>=0&&origin.y+visible.top>=0&&origin.x+visible.right<=client.right&&origin.y+visible.bottom<=client.bottom;};
+        bool fits=origin.x+visible.left>=0&&origin.y+visible.top>=0&&origin.x+visible.right<=client.right&&origin.y+visible.bottom<=client.bottom;
+        if(!fits)log<<"Bounds diagnostic: control "<<c.id<<" dpi "<<app.dpi<<" origin "<<origin.x<<","<<origin.y<<" visible "<<visible.left<<","<<visible.top<<","<<visible.right<<","<<visible.bottom<<" client "<<client.right<<","<<client.bottom<<"\n";return fits;};
 
     const std::pair<const wchar_t*,GUID> formats[]={{L"png",GUID_ContainerFormatPng},{L"jpg",GUID_ContainerFormatJpeg},{L"bmp",GUID_ContainerFormatBmp},{L"tiff",GUID_ContainerFormatTiff}};
     for(const auto& format:formats) {
@@ -1486,19 +1538,38 @@ int selfTest(const fs::path& report) {
             SetWindowTextW(app.search,L"Bild 2");
             success &=check(app.filtered.size()==1&&app.filtered.front().filename()==L"Bild 2.png","Native search filters gallery");
             SetWindowTextW(app.search,L"no-such-file");success &=check(app.filtered.empty(),"Search empty state");
-            SetWindowTextW(app.search,L"");command(SelectMode);command(GalleryBase);
+            SetWindowTextW(app.search,L"");command(SelectMode);SendMessageW(app.controls[GalleryBase].window,BM_CLICK,0,0);
             success &=check(app.selected.size()==1,"Native gallery selection");command(Favorite);
             success &=check(app.preferences.favorites.size()==1,"Save favorite");command(Favorites);
             success &=check(app.filtered.size()==1,"Favorites gallery filters saved photos");command(Favorite);
             success &=check(app.filtered.empty()&&app.preferences.favorites.empty(),"Remove favorite");command(SelectMode);command(Gallery);
             auto directCount=app.library.size();command(Recursive);success &=check(app.library.size()>directCount,"Recursive gallery includes nested exported files");command(Recursive);success &=check(app.library.size()==directCount,"Disable recursive gallery");
             command(Settings);success &=check(app.settings&&IsWindowVisible(app.controls[Language].window),"Settings screen controls");
+            bool tileLabels=app.preferences.tileInfo;SendMessageW(app.controls[TileInfo].window,BM_CLICK,0,0);success &=check(app.preferences.tileInfo!=tileLabels,"Native viewport button clicks reach the settings action");SendMessageW(app.controls[TileInfo].window,BM_CLICK,0,0);
             command(602);GetWindowTextW(app.controls[Settings].window,accessibleName,128);
             success &=check(foto::english&&std::wstring(accessibleName)==L"Settings"&&std::wstring(tr(L"Datei nicht gefunden"))==L"File not found","English buttons and error localization");
             command(601);GetWindowTextW(app.controls[Settings].window,accessibleName,128);
             success &=check(!foto::english&&std::wstring(accessibleName)==L"Einstellungen","German buttons switch immediately");
             command(612);success &=check(ui::background.GetR()>240,"Light theme palette");command(611);success &=check(ui::background.GetR()<50,"Dark theme palette");
             command(621);app.openPath(temp.path/L"Bild 2.png");pump();success &=check(!app.fit&&app.zoom==1,"Persisted actual-size opening preference");command(620);
+            // Capture displayed pixels without invalidating: a forced repaint would hide scroll ghosts.
+            auto capture=[&](HWND target,RECT area,bool print){
+                HDC screen=GetDC(target),memory=CreateCompatibleDC(screen);int width=area.right-area.left,height=area.bottom-area.top;
+                HBITMAP bitmap=CreateCompatibleBitmap(screen,width,height);auto old=SelectObject(memory,bitmap);
+                if(print)SendMessageW(target,WM_PRINTCLIENT,reinterpret_cast<WPARAM>(memory),PRF_CLIENT);else BitBlt(memory,0,0,width,height,screen,area.left,area.top,SRCCOPY);
+                SelectObject(memory,old);BITMAPINFO info{};info.bmiHeader.biSize=sizeof(BITMAPINFOHEADER);info.bmiHeader.biWidth=width;info.bmiHeader.biHeight=-height;info.bmiHeader.biPlanes=1;info.bmiHeader.biBitCount=32;info.bmiHeader.biCompression=BI_RGB;
+                std::vector<BYTE> pixels(size_t(width)*height*4);if(!GetDIBits(memory,bitmap,0,height,pixels.data(),&info,DIB_RGB_COLORS))pixels.clear();
+                DeleteObject(bitmap);DeleteDC(memory);ReleaseDC(target,screen);return pixels;
+            };
+            SetWindowPos(window,nullptr,0,0,1180,800,SWP_NOZORDER);command(Settings);bool headerStable=true,nativeViewport=true;
+            for(UINT dpi:{96u,120u,144u,192u}){app.dpi=dpi;app.settingsScroll.reset();refresh();float scale=dpi/96.0f;RECT client{};GetClientRect(window,&client);
+                RECT header{LONG(contentLeft()*scale),LONG(96*scale),client.right,LONG(169*scale)};auto beforeHeader=capture(window,header,false);
+                for(double position:{90.0,170.0,260.0,420.0,260.0,90.0,0.0}){app.settingsScroll.reset(position);redrawScroll();auto afterHeader=capture(window,header,false);headerStable&=!beforeHeader.empty()&&beforeHeader==afterHeader;
+                    for(const auto& entry:app.controls)if(entry.second.visible&&scrollingControl(entry.first))nativeViewport&=GetParent(entry.second.window)==app.viewport;}
+            }
+            app.dpi=96;app.settingsScroll.reset();refresh();
+            success &=check(headerStable,"Scrolling never leaves button pixels in the fixed header at 100/125/150/200 percent DPI");
+            success &=check(nativeViewport,"Native settings buttons are children of a fixed clipping viewport");
             command(Settings);SendMessageW(window,WM_MOUSEWHEEL,MAKEWPARAM(0,-WHEEL_DELTA),0);success &=check(app.settingsScroll.target>0&&app.settingsScroll.position==0,"Settings wheel queues smooth pixel movement");
             bool scrollPaint=true;
             for(int step=0;step<30;++step){SendMessageW(window,WM_MOUSEWHEEL,MAKEWPARAM(0,step<15?-WHEEL_DELTA:WHEEL_DELTA),0);scrollFrame(1.0/60);
@@ -1510,18 +1581,26 @@ int selfTest(const fs::path& report) {
             success &=check(scrollPaint,"Rapid dark settings scroll paints native buttons without white erase or print backgrounds");
             app.settingsScroll.reset(90);refresh();auto& themeButton=app.controls[Theme];RECT clipped{};HRGN nativeClip=CreateRectRgn(0,0,0,0);GetWindowRgn(themeButton.window,nativeClip);GetRgnBox(nativeClip,&clipped);DeleteObject(nativeClip);
             success &=check(themeButton.visible&&clipped.top>0&&clipped.bottom<=themeButton.pixelBounds.bottom,"Partial settings buttons are clipped to the viewport instead of popping out");
+            KillTimer(window,6);app.scrollAnimating=false;app.settingsScroll.reset();refresh();scrollWheel(-120);
+            auto timerBegan=std::chrono::steady_clock::now(),lastFrame=timerBegan;std::vector<double> intervals;
+            while(app.scrollAnimating&&std::chrono::steady_clock::now()-timerBegan<std::chrono::seconds(3)){
+                MsgWaitForMultipleObjects(0,nullptr,FALSE,10,QS_ALLINPUT);MSG message{};
+                while(PeekMessageW(&message,nullptr,0,0,PM_REMOVE)){if(message.message==WM_TIMER&&message.hwnd==window&&message.wParam==6){auto now=std::chrono::steady_clock::now();intervals.push_back(std::chrono::duration<double,std::milli>(now-lastFrame).count());lastFrame=now;}dispatchMessage(message);}
+            }
+            success &=check(!app.scrollAnimating&&app.settingsScroll.position==app.settingsScroll.target&&intervals.size()>2,"Real Windows timer messages animate and settle scrolling without forcing frames");
+            if(!intervals.empty()){std::sort(intervals.begin(),intervals.end());log<<"Scroll timer median: "<<intervals[intervals.size()/2]<<" ms between frames on test machine\n";}
             app.settingsScroll.reset();refresh();scrollWheel(-15);double fractionalTarget=app.settingsScroll.target;
             for(int frame=0;frame<80;++frame)scrollFrame(1.0/60);
             success &=check(fractionalTarget>0&&fractionalTarget<90&&app.settingsScroll.position==fractionalTarget,"Native precision wheel input settles at fractional pixel destination");
             app.preferences.animations=false;scrollWheel(-120);success &=check(app.settingsScroll.position==app.settingsScroll.target,"Reduced motion scrolls immediately without animation");app.preferences.animations=true;
             auto track=scrollTrack();app.scrollGrab=0;scrollDrag(track.top+track.height-track.thumb);success &=check(app.settingsScroll.position==track.maximum&&app.settingsScroll.velocity==0,"Scrollbar reaches last setting without residual spring motion");
             app.settingsScroll.reset(420);refresh();auto& radiusButton=app.controls[Radius];int originalRadius=app.preferences.radius;bool rounded=true;
-            for(int radius:{4,8,12,16}){app.preferences.radius=radius;for(UINT dpi:{96u,144u,192u}){app.dpi=dpi;refresh();RECT size{};GetClientRect(radiusButton.window,&size);HDC screen=GetDC(radiusButton.window),memory=CreateCompatibleDC(screen);HBITMAP bitmap=CreateCompatibleBitmap(screen,size.right,size.bottom);auto old=SelectObject(memory,bitmap);
+            for(int radius:{4,8,12,16}){app.preferences.radius=radius;for(UINT dpi:{96u,120u,144u,192u}){app.dpi=dpi;refresh();RECT size{};GetClientRect(radiusButton.window,&size);HDC screen=GetDC(radiusButton.window),memory=CreateCompatibleDC(screen);HBITMAP bitmap=CreateCompatibleBitmap(screen,size.right,size.bottom);auto old=SelectObject(memory,bitmap);
                 SetFocus(radiusButton.window);SendMessageW(radiusButton.window,WM_PRINTCLIENT,reinterpret_cast<WPARAM>(memory),PRF_CLIENT);
                 rounded&=GetPixel(memory,0,0)==ui::raised.ToCOLORREF()&&GetPixel(memory,size.right-1,0)==ui::raised.ToCOLORREF()&&GetPixel(memory,size.right/2,int(10*dpi/96))!=ui::surface.ToCOLORREF();
                 SelectObject(memory,old);DeleteObject(bitmap);DeleteDC(memory);ReleaseDC(radiusButton.window,screen);}}
             app.dpi=96;app.preferences.radius=originalRadius;app.settingsScroll.reset();SetFocus(window);refresh();
-            success &=check(rounded,"Raised rounded buttons and focus retain clean corners at 100/150/200 percent DPI");
+            success &=check(rounded,"Raised rounded buttons and focus retain clean corners at 100/125/150/200 percent DPI");
             // Reused drawing surfaces must not accumulate GDI objects over a long scroll.
             for(double position=0;position<scrollTrack().maximum;position+=100){app.settingsScroll.reset(position);redrawScroll();}
             app.settingsScroll.reset(scrollTrack().maximum);redrawScroll();app.settingsScroll.reset();redrawScroll();
@@ -1535,21 +1614,24 @@ int selfTest(const fs::path& report) {
             success &=check(app.galleryScroll.position>0&&app.galleryScroll.position<app.galleryScroll.target,"Gallery moves by pixels rather than jumping a whole row");
             auto& tile=app.controls[GalleryBase];HRGN tileClip=CreateRectRgn(0,0,0,0);GetWindowRgn(tile.window,tileClip);GetRgnBox(tileClip,&clipped);DeleteObject(tileClip);
             success &=check(tile.visible&&clipped.top>0,"Partial gallery thumbnails stay clipped below the gallery toolbar");
+            success &=check(GetParent(tile.window)==app.viewport,"Gallery thumbnails use the same fixed native clipping viewport");
             SetWindowPos(window,nullptr,0,0,1180,800,SWP_NOZORDER);command(Settings);app.settingsScroll.reset();refresh();
             command(Maximize);success &=check(IsZoomed(window),"Integrated title-bar maximize");command(Maximize);success &=check(!IsZoomed(window),"Integrated title-bar restore");
             command(Gallery);command(NavToggle);
             success &=check(app.navExpanded&&app.controls[Gallery].box.w>180,"Expanded navigation");
-            command(NavToggle);
+            command(NavToggle);bool iconsOnly=true;
+            for(UINT dpi:{96u,120u,144u,192u}){app.dpi=dpi;refresh();for(int id:{Gallery,Favorites,OpenFolder,About}){auto& control=app.controls[id];RECT area{};GetClientRect(control.window,&area);auto labeled=capture(control.window,area,true);auto savedCaption=control.caption;control.caption.clear();auto unlabeled=capture(control.window,area,true);control.caption=savedCaption;iconsOnly&=!labeled.empty()&&labeled==unlabeled&&GetWindowTextLengthW(control.window)>0;}}
+            app.dpi=96;refresh();success &=check(iconsOnly,"Collapsed navigation draws only centered icons while preserving accessible labels at every DPI");
             SetFocus(app.search);MSG tab{};tab.hwnd=app.search;tab.message=WM_KEYDOWN;tab.wParam=VK_TAB;dispatchMessage(tab);
             success &=check(GetFocus()!=app.search,"Tab leaves the native search field");
             for(int page:{Gallery,Settings}){SetWindowPos(window,nullptr,0,0,780,560,SWP_NOZORDER);command(page);command(NavToggle);RECT client{};GetClientRect(window,&client);bool fits=true;float scale=app.dpi/96.0f;
                 for(const auto& c:app.controls)if(c.second.visible){if(!fitsClient(c.second,client))fits=false;}
                 success &=check(fits,"Small gallery/settings with expanded navigation");command(NavToggle);}
-            for(UINT dpi:{96u,144u,192u}){
+            for(UINT dpi:{96u,120u,144u,192u}){
                 RECT size{0,0,LONG(1200*dpi/96),LONG(840*dpi/96)};SendMessageW(window,WM_DPICHANGED,MAKEWPARAM(dpi,dpi),reinterpret_cast<LPARAM>(&size));
                 for(int page:{Gallery,Settings}){command(page);RECT client{};GetClientRect(window,&client);bool fits=true;float scale=dpi/96.0f;
                     for(const auto& c:app.controls)if(c.second.visible){if(!fitsClient(c.second,client))fits=false;}
-                    success &=check(fits,"Gallery/settings bounds at 100/150/200 percent DPI");}
+                    success &=check(fits,"Gallery/settings bounds at 100/125/150/200 percent DPI");}
             }
             app.preferences.language=originalLanguage;app.applyLanguage();
             Preferences options;options.language=2;options.theme=2;options.tileInfo=false;options.actual=true;options.folders={temp.path};options.favorites={temp.path/L"Bild 2.png"};options.write(preferencesFile);Preferences roundtrip;roundtrip.read(preferencesFile);

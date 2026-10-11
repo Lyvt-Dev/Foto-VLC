@@ -1,14 +1,14 @@
-PAF-Photos 0.6.0 improves button rendering and scrolling throughout the gallery and settings.
+PAF-Photos 0.6.1 fixes the stray settings buttons and clipped sidebar text reported in 0.6.0.
 
-- Subtle raised button faces with an outer shadow and upper rim replace the recessed settings buttons. Rounded keyboard-focus outlines follow the chosen radius; complete background fills prevent visible rectangular corners at fractional DPI sizes.
-- Pixel-based scrolling replaces gallery row jumps and abrupt settings movement. A time-based, damped movement preserves momentum on repeated wheel input and settles gently. Small touchpad deltas, Windows scroll-line/page preferences and reduced-motion settings are respected.
-- Partial cards and their native buttons remain visible at viewport edges. The scrollbar uses the actual content range and dragging stops pending movement immediately.
-- Drawing buffers and fonts are reused, only visible settings are drawn, and scrolling invalidates the content area. Native child surfaces are composed together to reduce tearing.
+- Settings and gallery controls now live inside a fixed native scrolling viewport. Its parent boundary prevents buttons from painting over the heading or toolbar, even while partially visible and moving.
+- Collapsed navigation displays centered icons only. Expanded navigation still shows labels; accessible names and tooltips are retained in both modes.
+- Scrolling avoids repeated updates to the search field and reuses drawing surfaces and control placement. Animation timers use the Windows minimum interval instead of a 16 ms request that can fall onto a slower timer cadence. Movement remains time based, follows Windows wheel preferences, and respects reduced motion.
+- Shared control edges round consistently at fractional DPI scaling, including 125%, preventing a one-pixel overflow.
 
-Download **setup.exe** for a per-user installation with codecs. Existing PAF-Photos 0.5.0 installations can receive this release automatically; use Settings → Check for updates → Install now, or close the app after the update finishes downloading. Settings and originals are preserved. Versions before 0.5.0 need the setup once.
+Download **setup.exe** for a per-user installation with codecs. Existing PAF-Photos 0.5.0 and newer installations can receive this release automatically: Settings → Check for updates → Install now, or close the app after the update finishes downloading. Preferences and original images are preserved.
 
 **PAFPhotos-Windows-x64.zip** is the portable alternative; extract the complete ZIP. The standalone EXE includes fewer decoders. Builds are currently unsigned.
 
-Validation includes Windows controls and pixels at 100/150/200 percent DPI, partial viewport clipping, precision wheel input, reduced motion, scrollbar bounds, drawing-resource reuse, five actual conversion encoders, codec images, installer migration and updater verification. Portable motion tests compare behavior across different frame intervals. The Windows report records rendering time on the test machine; display smoothness also depends on hardware and Windows scheduling.
+Validation includes displayed header pixels captured without a forced repaint, native viewport containment, icon-only navigation with accessible labels, real timer-driven scrolling, and rounded controls at 100/125/150/200 percent DPI. It also exercises five conversion encoders, codec images, installer migration and updater verification. Portable motion tests compare different frame intervals. Rendering time and timer cadence are measured on the test machine; perceived smoothness also depends on hardware and Windows scheduling.
 
 The format guide lists decoding limits. The optional PAFPhotos-Codec-Sources.zip contains corresponding codec sources and licenses and is not required to run the app.

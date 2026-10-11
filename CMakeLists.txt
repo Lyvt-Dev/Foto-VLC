@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(PAFPhotos VERSION 0.6.0 LANGUAGES C CXX)
+project(PAFPhotos VERSION 0.6.1 LANGUAGES C CXX)
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)

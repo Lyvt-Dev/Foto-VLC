@@ -4,7 +4,7 @@ Ein kleiner, nativer Foto-Betrachter für **Windows 10/11 x64**, geschrieben in
 C++17. Galerie mit Suche und Favoriten, deutsche und englische Oberfläche,
 System-/Hell-/Dunkel-Design, keine Browser-Runtime und kein Account.
 
-> **PAF-Photos 0.6.0** ist eine Galerie und ein Foto-Betrachter. Die Unterstützung für jedes
+> **PAF-Photos 0.6.1** ist eine Galerie und ein Foto-Betrachter. Die Unterstützung für jedes
 > Design-, CAD- oder Spieleformat ist noch nicht vollständig. Alle 195 erfassten Endungen sind im
 > Dateifilter erfasst; die tatsächliche Unterstützung steht in
 > [docs/formats.md](docs/formats.md).
@@ -32,7 +32,7 @@ signiert. Die Prüfsumme steht im jeweiligen Release.
 
 - Eigenes Blenden-P-Logo, dezent erhabene Buttons mit sauberen Rundungen und weichen Hover-Übergängen.
 - Pixelgenaues Scrollen mit sanftem Abbremsen in Galerie und Einstellungen; kleine Touchpad-Bewegungen und Windows-Scroll-Vorgaben werden berücksichtigt.
-- Teilweise sichtbare Karten bleiben an den Rändern sichtbar; Fokusrahmen folgen dem eingestellten Eckenradius.
+- Ein fester Scrollbereich hält teilweise sichtbare Karten und Buttons unterhalb der Überschrift; Fokusrahmen folgen dem eingestellten Eckenradius.
 - Frei wählbare Akzentfarbe, Eckenradius (0–16 px), Animationen und JPEG-Qualität.
 - Echte Konvertierung als Kopie: PNG, JPEG, BMP, TIFF und verlustfreies WebP (Strg+S).
 - Drehen und Spiegeln werden beim Export übernommen; Originaldateien können nicht überschrieben werden.
@@ -42,7 +42,7 @@ signiert. Die Prüfsumme steht im jeweiligen Release.
 - Datei oder Ordner öffnen; Dateien und Ordner per Drag-and-drop laden.
 - Filmstreifen mit echten Vorschaubildern und natürlicher Dateisortierung (Bild 2 vor Bild 10).
 - Galerie mit mehreren Bilderordnern, Suche nach Dateiname/Endung und drei Vorschaugrößen.
-- Favoriten, Mehrfachauswahl und ausklappbare Navigation.
+- Favoriten, Mehrfachauswahl und ausklappbare Navigation mit ausschließlich Icons im zugeklappten Zustand.
 - Einstellungen mit Deutsch/Englisch/Systemsprache, System-/Hell-/Dunkel-Design und Zoom-Voreinstellung.
 - Automatische Übernahme der bisherigen Photo-VLC-/Foto-VLC-Einstellungen.
 - Kompakte Werkzeugleiste, native Windows-Schaltflächen und Hinweise beim Darüberfahren.

@@ -1,4 +1,4 @@
-# PAF-Photos 0.6.0
+# PAF-Photos 0.6.1
 
 A portable photo gallery and image viewer for Windows 10/11 (64-bit).
 
@@ -27,7 +27,8 @@ Choose system, dark or light appearance and your preferred opening zoom.
 Search by file name or extension. Use Select to select several photos, then
 Toggle favorites. You can also use the heart while viewing a photo.
 The sidebar shows your favorites; Sort reverses filename order and the grid
-button changes thumbnail size. Scroll to browse more images.
+button changes thumbnail size. Scroll to browse more images. Collapsed navigation
+shows icons only; hover for labels or expand it with the menu button.
 
 ## Convert and personalize
 
