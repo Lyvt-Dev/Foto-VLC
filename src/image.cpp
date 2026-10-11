@@ -81,7 +81,8 @@ Decode embeddedLoad(const fs::path& path) {
 }
 std::wstring magickPath() {
     wchar_t configured[32768]{};
-    DWORD length=GetEnvironmentVariableW(L"PHOTO_VLC_MAGICK",configured,32768);
+    DWORD length=GetEnvironmentVariableW(L"PAF_PHOTOS_MAGICK",configured,32768);
+    if(!length)length=GetEnvironmentVariableW(L"PHOTO_VLC_MAGICK",configured,32768);
     if(!length)length=GetEnvironmentVariableW(L"FOTO_VLC_MAGICK",configured,32768);
     if(length && length<32768) {
         fs::path p(configured); std::error_code ec;

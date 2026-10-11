@@ -1,4 +1,4 @@
-name: Build and release Photo VLC
+name: Build and release PAF-Photos
 on:
   push:
     branches: [main]
@@ -27,7 +27,7 @@ jobs:
         shell: pwsh
         run: |
           $project = Get-Content CMakeLists.txt -Raw
-          $version = [regex]::Match($project, 'project\(PhotoVLC VERSION ([0-9.]+)').Groups[1].Value
+          $version = [regex]::Match($project, 'project\(PAFPhotos VERSION ([0-9.]+)').Groups[1].Value
           if ($env:GITHUB_REF_NAME -ne "v$version") { throw 'Release tag does not match the application version' }
       - name: Configure x64
         run: cmake -S . -B build -A x64
@@ -56,7 +56,7 @@ jobs:
         run: |
           $fixtures = Join-Path $pwd 'tests/fixtures'
           $report = Join-Path $pwd 'build/codec-self-test.txt'
-          $process = Start-Process -FilePath 'build/Release/PhotoVLC.exe' -ArgumentList @('--codec-test', $fixtures, $report) -Wait -PassThru
+          $process = Start-Process -FilePath 'build/Release/PAFPhotos.exe' -ArgumentList @('--codec-test', $fixtures, $report) -Wait -PassThru
           if (Test-Path $report) {
             Get-Content $report
             Get-Content $report | Where-Object { $_ -match '^FAIL' } | ForEach-Object { Write-Output "::error::$_" }
@@ -69,7 +69,7 @@ jobs:
         shell: pwsh
         run: |
           $report = Join-Path $pwd 'build/windows-self-test.txt'
-          $process = Start-Process -FilePath 'build/Release/PhotoVLC.exe' -ArgumentList @('--self-test', $report) -Wait -PassThru
+          $process = Start-Process -FilePath 'build/Release/PAFPhotos.exe' -ArgumentList @('--self-test', $report) -Wait -PassThru
           if (Test-Path $report) {
             Get-Content $report
             Get-Content $report | Where-Object { $_ -match '^FAIL' } | ForEach-Object { Write-Output "::error::$_" }
@@ -84,8 +84,8 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Path dist/package -Force | Out-Null
-          Copy-Item build/Release/PhotoVLC.exe dist/PhotoVLC.exe
-          Copy-Item build/Release/PhotoVLC.exe, LICENSE, THIRD_PARTY_NOTICES.md dist/package/
+          Copy-Item build/Release/PAFPhotos.exe dist/PAFPhotos.exe
+          Copy-Item build/Release/PAFPhotos.exe, build/Release/PAFPhotos.Update.exe, LICENSE, THIRD_PARTY_NOTICES.md dist/package/
           Copy-Item docs/quickstart.md dist/package/README.md
           Copy-Item docs/formats.md dist/package/FORMATS.md
           Copy-Item third_party/libwebp/COPYING dist/package/WEBP-LICENSE.txt
@@ -96,49 +96,84 @@ jobs:
           Copy-Item build/codec-self-test.txt dist/codec-self-test.txt
           Copy-Item build/Release/codecs dist/package/codecs -Recurse
           Copy-Item docs/codecs.md dist/package/CODECS.md
-          Compress-Archive -Path dist/package/* -DestinationPath dist/PhotoVLC-Windows-x64.zip
-          $sum = (Get-FileHash dist/PhotoVLC.exe -Algorithm SHA256).Hash.ToLower()
-          "$sum  PhotoVLC.exe" | Set-Content -Encoding ascii dist/SHA256SUMS.txt
-          $zipSum = (Get-FileHash dist/PhotoVLC-Windows-x64.zip -Algorithm SHA256).Hash.ToLower()
-          "$zipSum  PhotoVLC-Windows-x64.zip" | Add-Content -Encoding ascii dist/SHA256SUMS.txt
+          Compress-Archive -Path dist/package/* -DestinationPath dist/PAFPhotos-Windows-x64.zip
+          $sum = (Get-FileHash dist/PAFPhotos.exe -Algorithm SHA256).Hash.ToLower()
+          "$sum  PAFPhotos.exe" | Set-Content -Encoding ascii dist/SHA256SUMS.txt
+          $zipSum = (Get-FileHash dist/PAFPhotos-Windows-x64.zip -Algorithm SHA256).Hash.ToLower()
+          "$zipSum  PAFPhotos-Windows-x64.zip" | Add-Content -Encoding ascii dist/SHA256SUMS.txt
       - name: Build and test Windows installer
         shell: pwsh
         run: |
-          $version = [regex]::Match((Get-Content CMakeLists.txt -Raw), 'project\(PhotoVLC VERSION ([0-9.]+)').Groups[1].Value
+          $version = [regex]::Match((Get-Content CMakeLists.txt -Raw), 'project\(PAFPhotos VERSION ([0-9.]+)').Groups[1].Value
           $payload = Join-Path $pwd 'dist/package'
           $compiler = 'C:/Program Files (x86)/Inno Setup 6/ISCC.exe'
           if (!(Test-Path $compiler)) { throw 'Inno Setup compiler is missing from the Windows runner' }
-          & $compiler "/DAppVersion=$version" "/DPayloadDir=$payload" installer/PhotoVLC.iss 2>&1 | Tee-Object build/installer.log
+          & $compiler "/DAppVersion=$version" "/DPayloadDir=$payload" installer/PAFPhotos.iss 2>&1 | Tee-Object build/installer.log
           if ($LASTEXITCODE -ne 0) { Get-Content build/installer.log -Tail 10 | ForEach-Object { Write-Output "::error::$_" }; throw 'Installer compilation failed' }
           $destination = Join-Path $pwd 'build/installer-test'
+          # Upgrade the last published Photo VLC installer before checking the new payload.
+          Invoke-WebRequest 'https://github.com/Lyvt-Dev/Photo-VLC/releases/download/v0.4.0/setup.exe' -OutFile build/previous-setup.exe
+          if ((Get-FileHash build/previous-setup.exe -Algorithm SHA256).Hash.ToLower() -ne '9a0c3caac0507ecad4b7f4bbb0713b109049044a9b70171c41280edf4c4a78ab') { throw 'Previous installer checksum mismatch' }
+          $previous = Start-Process build/previous-setup.exe -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=`"$destination`"") -Wait -PassThru
+          if ($previous.ExitCode -ne 0) { throw 'Previous version installation failed' }
+          $oldPrefs = Join-Path $env:LOCALAPPDATA 'PhotoVLC/settings.ini'
+          New-Item -ItemType Directory (Split-Path $oldPrefs) -Force | Out-Null
+          "[View]`nAutoUpdates=0`nRadius=3`nLanguage=2" | Set-Content $oldPrefs
+
           $install = Start-Process dist/setup.exe -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=`"$destination`"") -Wait -PassThru
           if ($install.ExitCode -ne 0) { throw 'Silent installation failed' }
-          foreach ($file in @('PhotoVLC.exe', 'codecs/magick.exe', 'LICENSE', 'THIRD_PARTY_NOTICES.md', 'unins000.exe')) {
+          foreach ($file in @('PAFPhotos.exe', 'PAFPhotos.Update.exe', 'codecs/magick.exe', 'LICENSE', 'THIRD_PARTY_NOTICES.md', 'unins000.exe')) {
             if (!(Test-Path (Join-Path $destination $file))) { throw "Missing installed file: $file" }
           }
-          if (!(Test-Path 'HKCU:/Software/Classes/Applications/PhotoVLC.exe/shell/open/command')) { throw 'Open With registration missing' }
+          if (Test-Path (Join-Path $destination 'PhotoVLC.exe')) { throw 'Upgrade retained old executable' }
+          if (Test-Path 'HKCU:/Software/Classes/Applications/PhotoVLC.exe') { throw 'Upgrade retained old Open With candidate' }
+          if (!(Test-Path 'HKCU:/Software/Classes/Applications/PAFPhotos.exe/shell/open/command')) { throw 'Open With registration missing' }
           $report = Join-Path $pwd 'dist/installer-self-test.txt'
           $codecReport = Join-Path $pwd 'build/installed-codec-test.txt'
           $fixtures = Join-Path $pwd 'tests/fixtures'
-          $check = Start-Process (Join-Path $destination 'PhotoVLC.exe') -ArgumentList @('--codec-test', $fixtures, $codecReport) -Wait -PassThru
+          $check = Start-Process (Join-Path $destination 'PAFPhotos.exe') -ArgumentList @('--codec-test', $fixtures, $codecReport) -Wait -PassThru
           if ($check.ExitCode -ne 0) { throw 'Installed codec runtime failed' }
+          # The updater runs outside the install folder and must wait for the app to exit.
+          $prefs = Join-Path $env:LOCALAPPDATA 'PAFPhotos/settings.ini'
+          New-Item -ItemType Directory (Split-Path $prefs) -Force | Out-Null
+          Copy-Item (Join-Path $destination 'PAFPhotos.Update.exe') build/apply-test.exe
+          $app = Start-Process (Join-Path $destination 'PAFPhotos.exe') -PassThru
+          Start-Sleep -Seconds 1
+          if (!(Test-Path $prefs) -or (Get-Content $prefs -Raw) -notmatch 'Radius=3') { throw 'Previous preferences did not migrate' }
+          $setup = Join-Path $pwd 'dist/setup.exe'
+          $hash = (Get-FileHash $setup -Algorithm SHA256).Hash.ToLower()
+          $bad = Start-Process build/apply-test.exe -ArgumentList @('--apply', '4294967295', "`"$setup`"", "`"$destination`"", ('0' * 64), '0') -Wait -PassThru
+          if ($bad.ExitCode -ne 5) { throw "Updater did not reject incorrect hash: $($bad.ExitCode)" }
+          $update = Start-Process build/apply-test.exe -ArgumentList @('--apply', $app.Id, "`"$setup`"", "`"$destination`"", $hash, '0') -PassThru
+          Start-Sleep -Seconds 1
+          if ($update.HasExited) { throw 'Updater failed to wait for running app' }
+          if (!$app.CloseMainWindow()) { Stop-Process $app.Id }
+          if (!$app.WaitForExit(10000)) { throw 'Application failed to exit' }
+          if (!$update.WaitForExit(60000)) { throw 'Update installation timed out' }
+          if ($update.ExitCode -ne 0) { throw "Update installation failed: $($update.ExitCode)" }
+          if ((Get-Content $prefs -Raw) -notmatch 'Radius=3') { throw 'Update changed preferences' }
+          'PASS updater waits for app exit, rejects incorrect SHA256, reinstalls complete payload and preserves preferences' | Set-Content dist/updater-self-test.txt
           $uninstall = Start-Process (Join-Path $destination 'unins000.exe') -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART') -Wait -PassThru
           if ($uninstall.ExitCode -ne 0) { throw 'Silent uninstall failed' }
           # Inno's uninstaller loader can finish briefly before its worker exits.
-          for ($attempt = 0; $attempt -lt 40 -and (Test-Path (Join-Path $destination 'PhotoVLC.exe')); $attempt++) { Start-Sleep -Milliseconds 250 }
-          if (Test-Path (Join-Path $destination 'PhotoVLC.exe')) { throw 'Uninstall left the application executable' }
-          if (Test-Path 'HKCU:/Software/Classes/Applications/PhotoVLC.exe') { throw 'Uninstall left Open With registration' }
+          for ($attempt = 0; $attempt -lt 40 -and (Test-Path (Join-Path $destination 'PAFPhotos.exe')); $attempt++) { Start-Sleep -Milliseconds 250 }
+          if (Test-Path (Join-Path $destination 'PAFPhotos.exe')) { throw 'Uninstall left the application executable' }
+          if (Test-Path 'HKCU:/Software/Classes/Applications/PAFPhotos.exe') { throw 'Uninstall left Open With registration' }
           'PASS silent installation, payload, Open With registration, installed codecs, uninstall and registry cleanup' | Set-Content $report
           $setupSum = (Get-FileHash dist/setup.exe -Algorithm SHA256).Hash.ToLower()
           "$setupSum  setup.exe" | Add-Content -Encoding ascii dist/SHA256SUMS.txt
+          $manifest = [ordered]@{version=$version;sha256=$setupSum;size=(Get-Item dist/setup.exe).Length}
+          $manifest | ConvertTo-Json -Compress | Set-Content -Encoding ascii dist/update.json
       - uses: actions/upload-artifact@v4
         with:
-          name: PhotoVLC-Windows-x64
+          name: PAFPhotos-Windows-x64
           path: |
-            dist/PhotoVLC.exe
+            dist/PAFPhotos.exe
             dist/setup.exe
+            dist/update.json
+            dist/updater-self-test.txt
             dist/installer-self-test.txt
-            dist/PhotoVLC-Windows-x64.zip
+            dist/PAFPhotos-Windows-x64.zip
             dist/SHA256SUMS.txt
             dist/windows-self-test.txt
             dist/codec-self-test.txt
@@ -152,7 +187,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
-          name: PhotoVLC-Windows-x64
+          name: PAFPhotos-Windows-x64
           path: dist
       - name: Package corresponding codec sources
         run: python3 scripts/package-codec-sources.py
@@ -161,5 +196,24 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "$GITHUB_REF_NAME" \
-            dist/PhotoVLC.exe dist/setup.exe dist/installer-self-test.txt dist/PhotoVLC-Windows-x64.zip dist/PhotoVLC-Codec-Sources.zip dist/SHA256SUMS.txt dist/windows-self-test.txt dist/codec-self-test.txt \
-            --verify-tag --title "Photo VLC $GITHUB_REF_NAME" --notes-file docs/release-notes.md
+            dist/PAFPhotos.exe dist/setup.exe dist/update.json dist/updater-self-test.txt dist/installer-self-test.txt dist/PAFPhotos-Windows-x64.zip dist/PAFPhotos-Codec-Sources.zip dist/SHA256SUMS.txt dist/windows-self-test.txt dist/codec-self-test.txt \
+            --verify-tag --title "PAF-Photos $GITHUB_REF_NAME" --notes-file docs/release-notes.md
+
+  published-update:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: release
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Verify real published updater on Windows
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download $env:GITHUB_REF_NAME --repo $env:GITHUB_REPOSITORY --pattern PAFPhotos.exe
+          $report = Join-Path $pwd 'published-update-self-test.txt'
+          $check = Start-Process ./PAFPhotos.exe -ArgumentList @('--update-test', "`"$report`"") -Wait -PassThru
+          if (Test-Path $report) { Get-Content $report; Get-Content $report | Where-Object { $_ -match '^FAIL' } | ForEach-Object { Write-Output "::error::$_" } }
+          if ($check.ExitCode -ne 0) { throw "Published HTTPS updater failed: $($check.ExitCode)" }
+          gh release upload $env:GITHUB_REF_NAME $report --repo $env:GITHUB_REPOSITORY --clobber

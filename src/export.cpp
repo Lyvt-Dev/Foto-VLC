@@ -50,7 +50,7 @@ bool copyPicture(const Picture& picture,int rotation,bool mirrored,HWND owner) {
     // Windows requires an owner: EmptyClipboard with a null owner makes
     // SetClipboardData fail even though OpenClipboard itself succeeded.
     HWND temporary=nullptr;
-    if(!owner){temporary=CreateWindowExW(0,L"STATIC",L"Photo VLC Clipboard",0,0,0,0,0,HWND_MESSAGE,nullptr,GetModuleHandleW(nullptr),nullptr);owner=temporary;}
+    if(!owner){temporary=CreateWindowExW(0,L"STATIC",L"PAF-Photos Clipboard",0,0,0,0,0,HWND_MESSAGE,nullptr,GetModuleHandleW(nullptr),nullptr);owner=temporary;}
     if(!owner||!OpenClipboard(owner)){DeleteObject(bitmap);if(temporary)DestroyWindow(temporary);return false;}
     bool copied=EmptyClipboard()&&SetClipboardData(CF_BITMAP,bitmap)!=nullptr;
     CloseClipboard();if(temporary)DestroyWindow(temporary);if(!copied)DeleteObject(bitmap);return copied;

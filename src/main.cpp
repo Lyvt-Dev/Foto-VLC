@@ -1,5 +1,6 @@
 #include "image.hpp"
 #include "export.hpp"
+#include "updater.hpp"
 #include <commdlg.h>
 #include "core.hpp"
 #include "layout.hpp"
@@ -25,16 +26,17 @@
 #include <set>
 #include <cmath>
 using namespace Gdiplus;
-constexpr UINT Done=WM_APP+1,ThumbDone=WM_APP+2,ExportDone=WM_APP+3;
-constexpr wchar_t AppClass[]=L"PhotoVLC.Main";
-constexpr wchar_t AppTitle[]=L"Photo VLC · " FOTO_VERSION_WSTRING;
+constexpr UINT Done=WM_APP+1,ThumbDone=WM_APP+2,ExportDone=WM_APP+3,UpdateDone=WM_APP+4;
+constexpr wchar_t AppClass[]=L"PAFPhotos.Main";
+constexpr wchar_t AppTitle[]=L"PAF-Photos · " FOTO_VERSION_WSTRING;
 enum Action {
     Open=1,OpenFolder,Prev,Next,Fit,Actual,ZoomOut,ZoomIn,Rotate,Full,Info,Formats,Slide,
     Home,Strip,More,About,HelpKeys,HelpFormats,CloseHelp,Reveal,CopyPath,ClearRecent,
     ReleasePage,SourcePage,ErrorDetails,WelcomeOpen,WelcomeFolder,ZoomMenu,
     NavToggle=30,Gallery,Favorites,Settings,ImportFolder,Favorite,Language,Theme,DefaultZoom,TileInfo,Sort,GridSize,SelectMode,ClearSelection,RemoveFolder,Minimize,Maximize,Exit,
     Export=48,Mirror,CopyRaster,ResetView,Accent,Radius,Animations,Recursive,Quality,
-    Search=60,GalleryBase=1000,RecentBase=100,ThumbBase=200
+    AutoUpdates=57,CheckUpdates,RevealSaved,
+    Search=60,CloseExport,OpenSaved,GalleryBase=1000,RecentBase=100,ThumbBase=200
 };
 enum class Icon {None,Image,Folder,Left,Right,Fit,Actual,Minus,Plus,Rotate,Full,Info,Strip,Play,Pause,More,Home,Close,Help,External,Copy,Menu,Heart,Settings,Search,Sort,Grid,Check,Computer,Window,Mirror,Convert};
 struct Control {
@@ -48,7 +50,7 @@ struct Control {
     size_t item=0;
 };
 struct Preferences {
-    bool details=false,strip=true,tileInfo=true,actual=false,animations=true,recursive=false;
+    bool details=false,strip=true,tileInfo=true,actual=false,animations=true,recursive=false,autoUpdates=true;
     int radius=8,quality=95;
     DWORD accent=RGB(76,194,255);
     int language=0,theme=0;
@@ -67,6 +69,7 @@ struct Preferences {
         radius=std::clamp(int(GetPrivateProfileIntW(L"View",L"Radius",8,file.c_str())),0,16);
         quality=std::clamp(int(GetPrivateProfileIntW(L"View",L"Quality",95,file.c_str())),1,100);
         animations=GetPrivateProfileIntW(L"View",L"Animations",1,file.c_str())!=0;
+        autoUpdates=GetPrivateProfileIntW(L"View",L"AutoUpdates",1,file.c_str())!=0;
         recursive=GetPrivateProfileIntW(L"View",L"Recursive",0,file.c_str())!=0;
         tileInfo=GetPrivateProfileIntW(L"View",L"TileInfo",1,file.c_str())!=0;
         actual=GetPrivateProfileIntW(L"View",L"Actual",0,file.c_str())!=0;
@@ -87,6 +90,7 @@ struct Preferences {
         content<<L"[View]\r\nDetails="<<(details?1:0)<<L"\r\nFilmstrip="<<(strip?1:0)
                <<L"\r\nLanguage="<<language<<L"\r\nTheme="<<theme<<L"\r\nTileInfo="<<tileInfo<<L"\r\nActual="<<actual
                <<L"\r\nAccent="<<accent<<L"\r\nRadius="<<radius<<L"\r\nQuality="<<quality<<L"\r\nAnimations="<<animations<<L"\r\nRecursive="<<recursive
+               <<L"\r\nAutoUpdates="<<autoUpdates
                <<L"\r\nWidth="<<width<<L"\r\nHeight="<<height<<L"\r\n[Recent]\r\n";
         for(size_t i=0;i<recent.size()&&i<4;++i)content<<i<<L"="<<recent[i].wstring()<<L"\r\n";
         for(auto section:{L"Folders",L"Favorites"}) {
@@ -120,6 +124,7 @@ struct ThumbResult {fs::path path;unsigned folder;std::shared_ptr<Picture> pictu
 void refresh();
 void command(int id);
 void layoutControls();
+void drawButton(const DRAWITEMSTRUCT& item);
 LRESULT CALLBACK wndProc(HWND,UINT,WPARAM,LPARAM);
 
 std::shared_ptr<Picture> thumbnail(const fs::path& path) {
@@ -149,12 +154,15 @@ struct App {
     std::set<fs::path> selected;
     std::wstring query;
     Preferences preferences;
-    fs::path settingsPath;
+    fs::path settingsPath,lastExport;
     std::vector<fs::path> files;
     size_t index=0;
     std::shared_ptr<Picture> picture;
     std::wstring error,fileSize,fileDate,notice;
     bool busy=false,info=false,strip=true,fullscreen=false,slideshow=false,fit=true,dragging=false,testing=false;
+    UpdateService updates;
+    bool installed=false,installUpdateNow=false,restartAfterUpdate=false,exportNotice=false;
+    fs::path executableDirectory;
     bool mirrored=false,exporting=false;
     int rotation=0,helpPage=-1,hover=0;
     double zoom=1,panX=0,panY=0;
@@ -180,8 +188,8 @@ struct App {
         if(testing)return;
         PWSTR local=nullptr;
         if(SUCCEEDED(SHGetKnownFolderPath(FOLDERID_LocalAppData,KF_FLAG_CREATE,nullptr,&local))) {
-            auto oldDirectory=fs::path(local)/L"FotoVLC";auto directory=fs::path(local)/L"PhotoVLC";CoTaskMemFree(local);
-            std::error_code ec;fs::create_directories(directory,ec);
+            std::error_code ec;auto oldDirectory=fs::path(local)/L"PhotoVLC";if(!fs::exists(oldDirectory/L"settings.ini",ec))oldDirectory=fs::path(local)/L"FotoVLC";auto directory=fs::path(local)/L"PAFPhotos";CoTaskMemFree(local);
+            ec.clear();fs::create_directories(directory,ec);
             if(!ec){settingsPath=directory/L"settings.ini";if(!fs::exists(settingsPath,ec)&&fs::exists(oldDirectory/L"settings.ini",ec))fs::copy_file(oldDirectory/L"settings.ini",settingsPath,fs::copy_options::skip_existing,ec);}
         }
         preferences.read(settingsPath);info=preferences.details;strip=preferences.strip;
@@ -244,11 +252,12 @@ struct App {
     }
     bool exportCopy(const fs::path& target,ExportFormat format){
         if(exporting||!picture||busy||files.empty())return false;
-        exporting=true;notice=tr(L"Bild wird konvertiert …");KillTimer(window,3);
+        exporting=true;exportNotice=false;notice=tr(L"Bild wird konvertiert …");KillTimer(window,3);
         {std::lock_guard<std::mutex> lock(mutex);queuedExport=ExportJob{picture,files[index],target,format,rotation,mirrored,unsigned(preferences.quality)};}
         cv.notify_one();return true;
     }
     void shutdown() {
+        updates.stop();
         {std::lock_guard<std::mutex> lock(mutex);stopping=true;queued.reset();queuedExport.reset();thumbQueue.clear();}
         cv.notify_one();if(worker.joinable())worker.join();
     }
@@ -258,7 +267,7 @@ struct App {
     }
     void request() {
         if(files.empty())return;
-        ++serial;busy=true;error.clear();picture.reset();gallery=false;settings=false;fit=!preferences.actual;zoom=1;rotation=0;mirrored=false;panX=panY=0;helpPage=-1;
+        exportNotice=false;++serial;busy=true;error.clear();picture.reset();gallery=false;settings=false;fit=!preferences.actual;zoom=1;rotation=0;mirrored=false;panX=panY=0;helpPage=-1;
         SetWindowTextW(window,(files[index].filename().wstring()+L" — "+AppTitle).c_str());
         std::error_code ec;auto bytes=fs::file_size(files[index],ec);
         std::wostringstream size;
@@ -303,6 +312,31 @@ struct App {
     }
 };
 App app;
+void checkUpdates(bool manual=false){
+    if(app.testing||app.settingsPath.empty())return;
+    auto state=app.updates.snapshot();
+    if(manual&&state.phase==UpdatePhase::Available&&!app.installed){ShellExecuteW(app.window,L"open",L"https://github.com/Lyvt-Dev/Photo-VLC/releases/latest",nullptr,nullptr,SW_SHOWNORMAL);return;}
+    if(manual&&state.phase==UpdatePhase::Ready){
+        if(!app.installed){ShellExecuteW(app.window,L"open",state.installer.c_str(),nullptr,nullptr,SW_SHOWNORMAL);return;}
+        if(app.exporting){app.notice=tr(L"Bitte warte, bis die Konvertierung abgeschlossen ist.");refresh();return;}
+        app.installUpdateNow=true;app.restartAfterUpdate=true;PostMessageW(app.window,WM_CLOSE,0,0);return;
+    }
+    auto cache=app.settingsPath.parent_path()/L"updates";
+    app.updates.start(app.window,UpdateDone,FOTO_VERSION_STRING,cache,app.installed&&(app.preferences.autoUpdates||manual));refresh();
+}
+const wchar_t* updateStatus(){
+    static std::wstring description;auto state=app.updates.snapshot();
+    switch(state.phase){
+    case UpdatePhase::Checking:return tr(L"Suche nach einer neuen Version …");
+    case UpdatePhase::Current:return tr(L"Du verwendest die aktuelle Version.");
+    case UpdatePhase::Available:return tr(L"Neue Version verfügbar. Installiere sie über die Release-Seite.");
+    case UpdatePhase::Downloading:return tr(L"Update wird im Hintergrund heruntergeladen …");
+    case UpdatePhase::Ready:description=tr(L"Version ")+std::wstring(state.version.begin(),state.version.end())+tr(L" wird beim Beenden installiert.");return description.c_str();
+    case UpdatePhase::Failed:return tr(L"Updates konnten nicht geprüft werden. Versuche es später erneut.");
+    default:return tr(L"Version " FOTO_VERSION_WSTRING L" · Lyvt-Dev · MIT");}
+}
+foto::ViewerLayout viewLayout();
+foto::Box exportNoticeBox(){auto l=viewLayout();float width=std::min(460.0f,l.canvas.w-48);return {l.canvas.w-width-24,120,width,124};}
 
 namespace ui {
 Color background(255,39,39,39),surface(255,32,32,32),raised(255,49,49,49),line(255,63,63,63);
@@ -429,6 +463,13 @@ void animateButtons(){if(motionEnabled())SetTimer(app.window,4,16,nullptr);else 
 Color blend(Color from,Color to,float progress){return Color(255,BYTE(from.GetR()+(to.GetR()-from.GetR())*progress),BYTE(from.GetG()+(to.GetG()-from.GetG())*progress),BYTE(from.GetB()+(to.GetB()-from.GetB())*progress));}
 LRESULT CALLBACK buttonProc(HWND window,UINT msg,WPARAM wp,LPARAM lp,UINT_PTR,DWORD_PTR id) {
     switch(msg) {
+    case WM_ERASEBKGND:return 1;
+    case WM_PAINT:case WM_PRINTCLIENT:{
+        PAINTSTRUCT paint{};HDC dc=msg==WM_PAINT?BeginPaint(window,&paint):reinterpret_cast<HDC>(wp);
+        RECT bounds{};GetClientRect(window,&bounds);DRAWITEMSTRUCT item{};item.CtlType=ODT_BUTTON;item.CtlID=UINT(id);item.hwndItem=window;item.hDC=dc;item.rcItem=bounds;item.itemAction=ODA_DRAWENTIRE;
+        auto state=SendMessageW(window,BM_GETSTATE,0,0);if(state&BST_PUSHED)item.itemState|=ODS_SELECTED;if(GetFocus()==window)item.itemState|=ODS_FOCUS;if(!IsWindowEnabled(window))item.itemState|=ODS_DISABLED;
+        drawButton(item);if(msg==WM_PAINT)EndPaint(window,&paint);return 0;
+    }
     case WM_MOUSEMOVE: {
         if(app.hover!=int(id)) {int old=app.hover;app.hover=int(id);animateButtons();if(app.controls.count(old))InvalidateRect(app.controls[old].window,nullptr,FALSE);InvalidateRect(window,nullptr,FALSE);}
         TRACKMOUSEEVENT tracking{sizeof(tracking),TME_LEAVE,window,0};TrackMouseEvent(&tracking);break;
@@ -458,8 +499,9 @@ void place(int id,foto::Box box,const std::wstring& caption,Icon icon=Icon::None
         SendMessageW(app.tooltip,TTM_UPDATETIPTEXTW,0,reinterpret_cast<LPARAM>(&tool));
     }
     float scale=app.dpi/96.0f;
-    SetWindowPos(c.window,nullptr,int(std::round(box.x*scale)),int(std::round(box.y*scale)),int(std::round(box.w*scale)),int(std::round(box.h*scale)),SWP_NOZORDER|SWP_NOACTIVATE);
-    EnableWindow(c.window,enabled);ShowWindow(c.window,SW_SHOWNA);InvalidateRect(c.window,nullptr,FALSE);
+    SetWindowPos(c.window,nullptr,int(std::round(box.x*scale)),int(std::round(box.y*scale)),int(std::round(box.w*scale)),int(std::round(box.h*scale)),SWP_NOZORDER|SWP_NOACTIVATE|SWP_NOREDRAW);
+    if(bool(IsWindowEnabled(c.window))!=enabled)EnableWindow(c.window,enabled);
+    if(!(GetWindowLongW(c.window,GWL_STYLE)&WS_VISIBLE))ShowWindow(c.window,SW_SHOWNA);
 }
 void scheduleThumbnails(size_t first,size_t count) {
     bool queued=false;
@@ -500,6 +542,7 @@ void layoutControls() {
     }else if(app.gallery||!file) {layoutGalleryControls();
     }else {
         place(Export,{62,74,136,30},tr(L"Konvertieren"),Icon::Convert,loaded&&!app.exporting,false,true,tr(L"Als anderes Format speichern (Strg+S)"));
+        if(!app.lastExport.empty())place(RevealSaved,{260,74,38,30},tr(L"Gespeicherte Kopie anzeigen"),Icon::Folder);
         place(Mirror,{210,74,38,30},tr(L"Spiegeln"),Icon::Mirror,loaded,app.mirrored,false,tr(L"Horizontal spiegeln (M)"));
         place(Home,{18,75,32,28},tr(L"Startseite"),Icon::Home,true,false,false,tr(L"Zur Startseite"));
         place(Strip,{w-250,74,126,30},tr(L"Filmstreifen"),Icon::Strip,true,app.strip,false,tr(L"Filmstreifen anzeigen oder ausblenden (T)"));
@@ -514,6 +557,11 @@ void layoutControls() {
         place(Favorite,{l.width-306,74,42,30},tr(L"Favorit"),Icon::Heart,loaded,std::find(app.preferences.favorites.begin(),app.preferences.favorites.end(),app.files[app.index])!=app.preferences.favorites.end());
         place(Full,{tx+340,ty+5,34,34},tr(L"Vollbild"),Icon::Full,true,app.fullscreen,false,tr(L"Vollbild ein-/ausschalten (F11)"));
         place(Slide,{tx+394,ty+5,46,34},app.slideshow?tr(L"Diashow anhalten"):tr(L"Diashow starten"),app.slideshow?Icon::Pause:Icon::Play,app.files.size()>1,app.slideshow,false,tr(L"Diashow starten oder anhalten (Leertaste)"));
+        if(app.exportNotice){auto panel=exportNoticeBox();
+            place(OpenSaved,{panel.x+18,panel.y+82,126,30},tr(L"Kopie öffnen"),Icon::Image);
+            place(RevealSaved,{panel.x+154,panel.y+82,162,30},tr(L"Im Ordner anzeigen"),Icon::Folder);
+            place(CloseExport,{panel.x+panel.w-34,panel.y+8,26,26},tr(L"Schließen"),Icon::Close);
+        }
         if(app.files.size()>1) {
             place(Prev,{8,l.image.y+l.image.h/2-22,32,44},tr(L"Vorheriges Bild"),Icon::Left,true,false,false,tr(L"Vorheriges Bild (←)"));
             place(Next,{l.canvas.w-40,l.image.y+l.image.h/2-22,32,44},tr(L"Nächstes Bild"),Icon::Right,true,false,false,tr(L"Nächstes Bild (→)"));
@@ -543,7 +591,8 @@ void layoutControls() {
 }
 void refresh() {
     if(!app.window)return;
-    ui::palette();updateZoom();layoutControls();InvalidateRect(app.window,nullptr,FALSE);
+    ui::palette();updateZoom();layoutControls();
+    RedrawWindow(app.window,nullptr,nullptr,RDW_INVALIDATE|RDW_NOERASE|RDW_ALLCHILDREN|RDW_UPDATENOW);
 }
 void drawButton(const DRAWITEMSTRUCT& item) {
     auto it=app.controls.find(int(item.CtlID));if(it==app.controls.end())return;
@@ -555,9 +604,9 @@ void drawButton(const DRAWITEMSTRUCT& item) {
     if(c.id>=ThumbBase)parent=ui::surface;
     if(c.id==Reveal||c.id==CopyPath)parent=ui::surface;
     if(c.id>=Fit&&c.id<=Slide&&c.id!=Info&&c.id!=Formats)parent=ui::surface;
-    if(c.id==ZoomMenu)parent=ui::surface;
+    if(c.id==ZoomMenu||c.id==OpenSaved||c.id==CloseExport||c.id==RevealSaved)parent=ui::surface;
     ui::fill(g,parent,{0,0,w,h});
-    bool setting=app.settings&&(c.id==Theme||c.id==Language||c.id==DefaultZoom||c.id==TileInfo||c.id==Strip||c.id==RemoveFolder||c.id==ClearRecent||c.id==ReleasePage||(c.id>=Accent&&c.id<=Quality));
+    bool setting=app.settings&&(c.id==Theme||c.id==Language||c.id==DefaultZoom||c.id==TileInfo||c.id==Strip||c.id==RemoveFolder||c.id==ClearRecent||c.id==ReleasePage||(c.id>=Accent&&c.id<=CheckUpdates));
     if(setting)parent=ui::raised;
     ui::fill(g,parent,{0,0,w,h});
     bool hot=app.hover==c.id,pressed=(item.itemState&ODS_SELECTED)!=0,focused=(item.itemState&ODS_FOCUS)!=0;
@@ -591,8 +640,8 @@ void drawButton(const DRAWITEMSTRUCT& item) {
         ui::label(g,c.caption,{60,7,w-86,23},13,fg,true);
         if(c.item<app.preferences.recent.size())ui::label(g,app.preferences.recent[c.item].parent_path().wstring(),{60,31,w-86,17},11,ui::muted);
         ui::icon(g,Icon::Right,w-24,20,ui::muted,16);
-    }else if(setting&&(c.id==TileInfo||c.id==Strip||c.id==Animations||c.id==Recursive)){
-        bool on=c.id==TileInfo?app.preferences.tileInfo:c.id==Strip?app.strip:c.id==Animations?app.preferences.animations:app.preferences.recursive;
+    }else if(setting&&(c.id==TileInfo||c.id==Strip||c.id==Animations||c.id==Recursive||c.id==AutoUpdates)){
+        bool on=c.id==TileInfo?app.preferences.tileInfo:c.id==Strip?app.strip:c.id==Animations?app.preferences.animations:c.id==AutoUpdates?app.preferences.autoUpdates:app.preferences.recursive;
         ui::label(g,c.caption,{0,0,42,h},14,ui::text);
         ui::round(g,on?ui::accent:ui::line,{50,(h-24)/2,52,24},12);
         ui::round(g,on?Color(255,20,20,20):ui::muted,{on?80.0f:54.0f,(h-16)/2,16,16},8);
@@ -618,7 +667,7 @@ void drawButton(const DRAWITEMSTRUCT& item) {
 void drawWelcome(Graphics& g,const foto::ViewerLayout& l) {
     float x=std::max(40.0f,(l.width-850)/2),y=std::max(132.0f,(l.height-370)/2);
     ui::round(g,ui::surface,{x,y,52,52},13);ui::icon(g,Icon::Image,x+13,y+13,ui::accent,26);
-    ui::label(g,tr(L"Willkommen bei Photo VLC"),{x,y+67,380,72},30,ui::text,true,false,true);
+    ui::label(g,tr(L"Willkommen bei PAF-Photos"),{x,y+67,380,72},30,ui::text,true,false,true);
     ui::label(g,tr(L"Öffne ein Bild oder einen Ordner.\nDu kannst Dateien auch hierher ziehen."),{x,y+140,360,40},13,ui::muted,false,false,true);
     ui::label(g,tr(L"Strg + O zum Öffnen · F1 für Hilfe"),{x,y+242,350,24},11,ui::faint);
     float rx=x+450,rw=std::max(250.0f,l.width-rx-40),ry=y+36;
@@ -637,7 +686,7 @@ void drawHelp(Graphics& g,const foto::ViewerLayout& l) {
     ui::fill(g,ui::line,{x,248,w,1});
     if(app.helpPage==0) {
         ui::brand(g,x,278,48);
-        ui::label(g,L"Photo VLC",{x+66,276,w-66,32},25,ui::text,true);
+        ui::label(g,L"PAF-Photos",{x+66,276,w-66,32},25,ui::text,true);
         ui::label(g,L"Version " FOTO_VERSION_WSTRING L"  ·  Windows 64-Bit",{x+66,312,w-66,25},13,ui::accent);
         ui::label(g,tr(L"Ein schneller Bildbetrachter für deine Fotos, Illustrationen und Bilddateien."),{x,355,w,28},14);
         ui::label(g,tr(L"Entwickelt von Lyvt-Dev · MIT-Lizenz"),{x,389,w,24},12,ui::muted);
@@ -736,7 +785,9 @@ void paint(HWND window) {
         Graphics g(memory);float scale=app.dpi/96.0f;g.ScaleTransform(scale,scale);g.SetSmoothingMode(SmoothingModeAntiAlias);g.SetTextRenderingHint(TextRenderingHintClearTypeGridFit);
         auto l=viewLayout();float w=l.width,h=l.height;ui::fill(g,ui::background,{0,0,w,h});ui::fill(g,ui::surface,{0,0,w,64});
         drawShell(g,l);
-        if(app.helpPage>=0)drawHelp(g,l);else if(app.settings)drawSettings(g,l);else if(app.gallery||app.files.empty())drawGallery(g,l);else drawViewer(g,l);
+        if(app.helpPage>=0)drawHelp(g,l);else if(app.settings)drawSettings(g,l);else if(app.gallery||app.files.empty())drawGallery(g,l);else {drawViewer(g,l);if(app.exportNotice){auto panel=exportNoticeBox();ui::round(g,ui::surface,panel);ui::icon(g,Icon::Check,panel.x+18,panel.y+15,ui::accent,22);
+            ui::label(g,tr(L"Kopie gespeichert"),{panel.x+50,panel.y+10,panel.w-94,30},16,ui::text,true);
+            ui::label(g,app.lastExport.wstring(),{panel.x+18,panel.y+42,panel.w-36,34},12,ui::muted,false,false,true);}}
         ui::fill(g,ui::line,{0,h-28,w,1});
         std::wstring status=tr(L"Bereit");
         if(!app.gallery&&!app.settings&&!app.files.empty()&&app.helpPage<0) {
@@ -745,7 +796,7 @@ void paint(HWND window) {
             if(app.slideshow)status+=tr(L"   ·   Diashow läuft");
         }
         ui::label(g,app.exporting?tr(L"Bild wird konvertiert …"):app.notice.empty()?status:app.notice,{20,h-27,w-295,26},10,app.notice.empty()?ui::muted:ui::accent);
-        ui::label(g,std::wstring(L"Photo VLC " FOTO_VERSION_WSTRING)+tr(L"   ·   F1 Hilfe"),{w-230,h-27,210,26},10,ui::faint,false,true);
+        ui::label(g,std::wstring(L"PAF-Photos " FOTO_VERSION_WSTRING)+tr(L"   ·   F1 Hilfe"),{w-230,h-27,210,26},10,ui::faint,false,true);
     }
     BitBlt(dc,0,0,bounds.right,bounds.bottom,memory,0,0,SRCCOPY);SelectObject(memory,previous);DeleteObject(buffer);DeleteDC(memory);EndPaint(window,&ps);
 }
@@ -765,7 +816,7 @@ void layoutShell(){
         place(Gallery,{6,128,side-12,44},app.navExpanded?tr(L"Galerie"):tr(L"Galerie"),Icon::Image,true,app.gallery&&!app.favoritesView&&!app.settings);
         place(Favorites,{6,178,side-12,44},tr(L"Favoriten"),Icon::Heart,true,app.favoritesView&&!app.settings);
         place(OpenFolder,{6,250,side-12,44},tr(L"Ordner hinzufügen"),Icon::Folder);
-        place(About,{6,l.height-82,side-12,40},tr(L"Über Photo VLC"),Icon::Info);
+        place(About,{6,l.height-82,side-12,40},tr(L"Über PAF-Photos"),Icon::Info);
     }else place(OpenFolder,{w-392,12,40,40},tr(L"Ordner öffnen"),Icon::Folder);
     if(!app.search){
         app.search=CreateWindowExW(0,L"EDIT",L"",WS_CHILD|WS_TABSTOP|ES_AUTOHSCROLL,0,0,1,1,app.window,reinterpret_cast<HMENU>(INT_PTR(Search)),GetModuleHandleW(nullptr),nullptr);
@@ -817,7 +868,7 @@ void layoutGalleryControls(){
 }
 struct SettingRow{float y;const wchar_t* title;const wchar_t* description;Icon icon;int action;};
 std::vector<SettingRow> settingsRows(){return {
-    {202,tr(L"App-Design"),tr(L"Wähle das Erscheinungsbild von Photo VLC."),Icon::Settings,Theme},
+    {202,tr(L"App-Design"),tr(L"Wähle das Erscheinungsbild von PAF-Photos."),Icon::Settings,Theme},
     {296,tr(L"Sprache"),tr(L"Die Oberfläche wird sofort aktualisiert."),Icon::Image,Language},
     {390,tr(L"Dateinamen in der Galerie"),tr(L"Zeige den Namen unter jedem Vorschaubild."),Icon::Grid,TileInfo},
     {484,tr(L"Akzentfarbe"),tr(L"Wähle eine eigene Farbe für aktive Elemente."),Icon::Settings,Accent},
@@ -829,11 +880,14 @@ std::vector<SettingRow> settingsRows(){return {
     {1270,tr(L"Unterordner einbeziehen"),tr(L"Suche auch in Unterordnern. Maximal 10.000 Bilder, keine Verzeichnislinks."),Icon::Folder,Recursive},
     {1364,tr(L"Galerieordner"),tr(L"Entferne einen Ordner aus der Galerie. Deine Dateien bleiben erhalten."),Icon::Folder,RemoveFolder},
     {1458,tr(L"Lokalen Verlauf löschen"),tr(L"Entferne die Liste der zuletzt geöffneten Bilder."),Icon::Info,ClearRecent},
-    {1614,tr(L"Photo VLC"),tr(L"Version " FOTO_VERSION_WSTRING L" · Lyvt-Dev · MIT"),Icon::Info,ReleasePage}
+    {1614,tr(L"PAF-Photos"),updateStatus(),Icon::Info,CheckUpdates},
+    {1708,tr(L"Automatische Updates"),tr(L"Prüfe beim Start und täglich. Installierte Apps aktualisieren sich beim Beenden."),Icon::External,AutoUpdates}
 };}
 const wchar_t* settingValue(int id){
     static std::wstring value;
     switch(id){
+    case AutoUpdates:return app.preferences.autoUpdates?tr(L"Ein"):tr(L"Aus");
+    case CheckUpdates:{auto state=app.updates.snapshot();return state.phase==UpdatePhase::Checking?tr(L"Prüfen …"):state.phase==UpdatePhase::Downloading?tr(L"Herunterladen …"):state.phase==UpdatePhase::Ready?tr(L"Jetzt installieren"):tr(L"Nach Updates suchen");}
     case Accent:return tr(L"Farbe wählen");
     case Radius:value=std::to_wstring(app.preferences.radius)+L" px";return value.c_str();
     case Quality:value=std::to_wstring(app.preferences.quality)+L" %";return value.c_str();
@@ -849,10 +903,10 @@ const wchar_t* settingValue(int id){
 }
 void layoutSettingsControls(){
     auto l=viewLayout();float x=contentLeft(),w=std::min(850.0f,l.width-x-42);
-    int maxScroll=std::max(0,int(1720-(l.height-36)));app.settingsScroll=std::clamp(app.settingsScroll,0,maxScroll);
+    int maxScroll=std::max(0,int(1810-(l.height-36)));app.settingsScroll=std::clamp(app.settingsScroll,0,maxScroll);
     for(auto row:settingsRows()){
         float y=row.y-app.settingsScroll;if(y<170||y+88>l.height-36)continue;
-        float controlWidth=row.action==DefaultZoom?190:row.action==TileInfo||row.action==Strip||row.action==Animations||row.action==Recursive?112:170;
+        float controlWidth=row.action==DefaultZoom?190:row.action==TileInfo||row.action==Strip||row.action==Animations||row.action==Recursive||row.action==AutoUpdates?112:170;
         place(row.action,{x+w-controlWidth-20,y+24,controlWidth,40},settingValue(row.action),Icon::None,row.action!=RemoveFolder||!app.preferences.folders.empty());
         SetWindowTextW(app.controls[row.action].window,(std::wstring(row.title)+L": "+settingValue(row.action)).c_str());
     }
@@ -863,7 +917,7 @@ void drawShell(Graphics& g,const foto::ViewerLayout& l){
         ui::round(g,ui::raised,{62,12,l.width-482,40},5);ui::icon(g,Icon::Search,68,23,ui::muted,18);
         float side=sidebarWidth();ui::fill(g,ui::surface,{0,64,side,l.height-92});ui::fill(g,ui::line,{side,64,1,l.height-92});ui::fill(g,ui::line,{12,235,side-24,1});
     }else{
-        ui::label(g,L"Photo VLC",{56,14,104,34},16,ui::text,true);
+        ui::label(g,L"PAF-Photos",{56,14,104,34},16,ui::text,true);
         if(!app.files.empty())ui::label(g,app.files[app.index].filename().wstring(),{180,14,l.width-595,34},14,ui::muted,false,true);
     }
 }
@@ -876,7 +930,7 @@ void drawGallery(Graphics& g,const foto::ViewerLayout& l){
     if(app.galleryMaxScroll>0&&!app.filtered.empty()){float track=l.height-240,thumb=std::max(30.0f,track/(app.galleryMaxScroll+1));ui::round(g,ui::faint,{l.width-10,202+float(app.galleryScroll)/app.galleryMaxScroll*(track-thumb),3,thumb},1.5f);}
     if(app.filtered.empty()){
         float y=std::max(320.0f,l.height/2);ui::brand(g,x+w/2-36,y-96,72);
-        ui::label(g,app.library.empty()?tr(L"Los geht’s mit Photo VLC"):app.favoritesView?tr(L"Noch keine Favoriten"):tr(L"Keine passenden Bilder"),{x,y,w,46},30,ui::text,false,true);
+        ui::label(g,app.library.empty()?tr(L"Los geht’s mit PAF-Photos"):app.favoritesView?tr(L"Noch keine Favoriten"):tr(L"Keine passenden Bilder"),{x,y,w,46},30,ui::text,false,true);
         ui::label(g,app.library.empty()?tr(L"Füge einen Bilderordner hinzu. Deine Fotos erscheinen dann hier."):app.favoritesView?tr(L"Markiere Fotos mit dem Herz, um sie hier wiederzufinden."):tr(L"Versuche einen anderen Dateinamen oder ein anderes Format."),{x,y+52,w,38},18,ui::muted,false,true,true);
     }
 }
@@ -892,7 +946,7 @@ void drawSettings(Graphics& g,const foto::ViewerLayout& l){
         ui::label(g,row.description,{x+74,y+43,w-290,34},13,ui::muted,false,false,true);
     }
     g.Restore(saved);
-    if(1720>l.height-36){float track=l.height-214,thumb=std::max(40.0f,track*track/980);float maxScroll=float(std::max(1,int(1720-(l.height-36))));ui::round(g,ui::line,{l.width-10,176+float(app.settingsScroll)/maxScroll*(track-thumb),3,thumb},1.5f);}
+    if(1810>l.height-36){float track=l.height-214,thumb=std::max(40.0f,track*track/980);float maxScroll=float(std::max(1,int(1810-(l.height-36))));ui::round(g,ui::line,{l.width-10,176+float(app.settingsScroll)/maxScroll*(track-thumb),3,thumb},1.5f);}
 }
 
 void choose(bool folder,bool import=false) {
@@ -914,28 +968,33 @@ void choose(bool folder,bool import=false) {
         if(SUCCEEDED(dialog->GetResult(item.out()))) {PWSTR path=nullptr;if(SUCCEEDED(item->GetDisplayName(SIGDN_FILESYSPATH,&path))){if(import){fs::path folderPath(path);if(std::find(app.preferences.folders.begin(),app.preferences.folders.end(),folderPath)==app.preferences.folders.end())app.preferences.folders.push_back(folderPath);app.rebuildLibrary();app.saveSettings();app.gallery=true;app.settings=false;refresh();}else app.openPath(path);CoTaskMemFree(path);}}
     }
 }
-void chooseExport() {
+void chooseExport(ExportFormat format) {
     if(!app.picture||app.busy||app.exporting||app.files.empty())return;
     auto& picture=*app.picture;
     if((picture.originalW>picture.width||picture.originalH>picture.height||picture.frames>1||picture.engine.find(L"ImageMagick")!=std::wstring::npos)&&
        MessageBoxW(app.window,tr(L"Exportiert wird das angezeigte Rasterbild mit seinen aktuellen Pixelmaßen. Bei Animationen oder mehrseitigen Dateien nur das erste Bild. Fortfahren?"),tr(L"Bild konvertieren"),MB_OKCANCEL|MB_ICONINFORMATION)!=IDOK)return;
     Com<IFileSaveDialog> dialog;
     if(FAILED(CoCreateInstance(CLSID_FileSaveDialog,nullptr,CLSCTX_INPROC_SERVER,IID_PPV_ARGS(dialog.out()))))return;
-    COMDLG_FILTERSPEC filters[]={{L"PNG (*.png)",L"*.png"},{L"JPEG (*.jpg)",L"*.jpg"},{L"BMP (*.bmp)",L"*.bmp"},{L"TIFF (*.tiff)",L"*.tiff"},{L"WebP (*.webp)",L"*.webp"}};
-    dialog->SetFileTypes(5,filters);dialog->SetFileTypeIndex(1);dialog->SetDefaultExtension(L"png");
+    const wchar_t* names[]={L"PNG (*.png)",L"JPEG (*.jpg)",L"BMP (*.bmp)",L"TIFF (*.tiff)",L"WebP (*.webp)"};
+    auto extension=exportExtension(format);std::wstring pattern=L"*"+std::wstring(extension);
+    COMDLG_FILTERSPEC filter{names[int(format)],pattern.c_str()};
+    dialog->SetFileTypes(1,&filter);dialog->SetFileTypeIndex(1);dialog->SetDefaultExtension(extension+1);
+    Com<IShellItem> folder;if(SUCCEEDED(SHCreateItemFromParsingName(app.files[app.index].parent_path().c_str(),nullptr,IID_PPV_ARGS(folder.out()))))dialog->SetFolder(folder);
     dialog->SetOptions(FOS_FORCEFILESYSTEM|FOS_NOCHANGEDIR|FOS_PATHMUSTEXIST|FOS_OVERWRITEPROMPT|FOS_STRICTFILETYPES);
     dialog->SetTitle(tr(L"Bild konvertieren"));
-    auto name=app.files[app.index].stem().wstring()+L"-PhotoVLC.png";dialog->SetFileName(name.c_str());
+    auto name=app.files[app.index].stem().wstring()+L"-PAFPhotos"+extension;dialog->SetFileName(name.c_str());
     if(FAILED(dialog->Show(app.window)))return;
-    Com<IShellItem> item;UINT type=1;dialog->GetFileTypeIndex(&type);
-    if(type<1||type>5||FAILED(dialog->GetResult(item.out())))return;
+    Com<IShellItem> item;if(FAILED(dialog->GetResult(item.out())))return;
     PWSTR chosen=nullptr;if(FAILED(item->GetDisplayName(SIGDN_FILESYSPATH,&chosen)))return;
     fs::path target(chosen);CoTaskMemFree(chosen);auto before=target;
-    auto format=static_cast<ExportFormat>(type-1);target.replace_extension(exportExtension(format));
+    target.replace_extension(exportExtension(format));
     // Some shell implementations append the chosen extension twice.
     while(CompareStringOrdinal(target.stem().extension().c_str(),-1,target.extension().c_str(),-1,TRUE)==CSTR_EQUAL)target=target.parent_path()/target.stem();
     std::error_code error;
     if(target!=before&&fs::exists(target,error)&&MessageBoxW(app.window,tr(L"Die Zieldatei existiert bereits. Ersetzen?"),tr(L"Bild konvertieren"),MB_YESNO|MB_ICONQUESTION)!=IDYES)return;
+    if(fs::equivalent(app.files[app.index],target,error)||CompareStringOrdinal(fs::absolute(app.files[app.index]).lexically_normal().c_str(),-1,fs::absolute(target).lexically_normal().c_str(),-1,TRUE)==CSTR_EQUAL){
+        MessageBoxW(app.window,tr(L"Wähle einen neuen Dateinamen. Die Originaldatei bleibt unverändert."),tr(L"Bild konvertieren"),MB_OK|MB_ICONINFORMATION);return;}
+    if(format==ExportFormat::WebP&&(picture.width>16383||picture.height>16383)){MessageBoxW(app.window,tr(L"WebP erlaubt maximal 16.383 Pixel pro Seite. Wähle für dieses Bild PNG oder TIFF."),tr(L"Bild konvertieren"),MB_OK|MB_ICONINFORMATION);return;}
     app.exportCopy(target,format);
     refresh();
 }
@@ -965,7 +1024,7 @@ void popup(int action) {
             AppendMenuW(menu,MF_STRING,Home,tr(L"Zur Startseite"));
         }
         AppendMenuW(menu,MF_SEPARATOR,0,nullptr);AppendMenuW(menu,MF_STRING,HelpKeys,tr(L"Tastenkürzel\tF1"));AppendMenuW(menu,MF_STRING,HelpFormats,tr(L"Unterstützte Dateiformate"));
-        AppendMenuW(menu,MF_STRING,About,tr(L"Über Photo VLC"));
+        AppendMenuW(menu,MF_STRING,About,tr(L"Über PAF-Photos"));
         if(!app.preferences.recent.empty()){AppendMenuW(menu,MF_SEPARATOR,0,nullptr);AppendMenuW(menu,MF_STRING,ClearRecent,tr(L"Liste »Zuletzt geöffnet« leeren"));}
     }
     RECT r{};GetWindowRect(app.controls[action].window,&r);
@@ -975,6 +1034,7 @@ void popup(int action) {
     }else if(selected)command(selected);
 }
 void command(int id) {
+    if(id>=650&&id<=654){chooseExport(static_cast<ExportFormat>(id-650));return;}
     if(id>=GalleryBase&&id<GalleryBase+100){auto c=app.controls.find(id);if(c!=app.controls.end()&&c->second.item<app.filtered.size()){auto path=app.filtered[c->second.item];if(app.selectMode){if(!app.selected.erase(path))app.selected.insert(path);refresh();}else app.openPath(path);}return;}
     if(id>=600&&id<=602){app.preferences.language=id-600;app.applyLanguage();app.saveSettings();refresh();return;}
     if(id>=610&&id<=612){app.preferences.theme=id-610;app.saveSettings();refresh();return;}
@@ -997,7 +1057,14 @@ void command(int id) {
     case Mirror:if(loaded)app.mirrored=!app.mirrored;break;
     case ResetView:app.rotation=0;app.mirrored=false;app.fit=true;app.panX=app.panY=0;break;
     case CopyRaster:if(loaded){app.notice=copyPicture(*app.picture,app.rotation,app.mirrored,app.window)?tr(L"Bild kopiert"):tr(L"Bild konnte nicht kopiert werden.");SetTimer(app.window,3,2500,nullptr);}break;
-    case Export:if(loaded)chooseExport();return;
+    case Export:if(loaded&&!app.exporting){HMENU menu=CreatePopupMenu();const wchar_t* formats[]={L"PNG",L"JPEG",L"BMP",L"TIFF",L"WebP"};
+        for(int i=0;i<5;++i)AppendMenuW(menu,MF_STRING,650+i,formats[i]);RECT r{};GetWindowRect(app.controls[Export].window,&r);
+        int selected=int(TrackPopupMenu(menu,TPM_RETURNCMD,r.left,r.bottom,0,app.window,nullptr));DestroyMenu(menu);if(selected)command(selected);}return;
+    case OpenSaved:if(!app.lastExport.empty())app.openPath(app.lastExport);return;
+    case CloseExport:app.exportNotice=false;break;
+    case CheckUpdates:checkUpdates(true);return;
+    case AutoUpdates:app.preferences.autoUpdates=!app.preferences.autoUpdates;app.saveSettings();if(app.preferences.autoUpdates)checkUpdates();else app.updates.stop();break;
+    case RevealSaved:if(!app.lastExport.empty()){auto item=ILCreateFromPathW(app.lastExport.c_str());if(item){SHOpenFolderAndSelectItems(item,0,nullptr,0);ILFree(item);}}break;
     case Rotate:if(loaded){app.rotation=(app.rotation+1)%4;app.panX=app.panY=0;}break;
     case Info:app.info=!app.info;app.saveSettings();break;
     case Strip:app.strip=!app.strip;app.saveSettings();break;
@@ -1095,6 +1162,7 @@ LRESULT CALLBACK wndProc(HWND window,UINT message,WPARAM wp,LPARAM lp) {
     case WM_COMMAND:if(LOWORD(wp)==Search&&HIWORD(wp)==EN_CHANGE){int count=GetWindowTextLengthW(app.search);std::vector<wchar_t> text(count+1);GetWindowTextW(app.search,text.data(),count+1);app.query=text.data();app.filterLibrary();refresh();return 0;}if(HIWORD(wp)==BN_CLICKED){command(LOWORD(wp));return 0;}break;
     case WM_CTLCOLOREDIT:if(reinterpret_cast<HWND>(lp)==app.search){HDC dc=reinterpret_cast<HDC>(wp);SetTextColor(dc,ui::text.ToCOLORREF());SetBkColor(dc,ui::raised.ToCOLORREF());static HBRUSH brush=nullptr;if(brush)DeleteObject(brush);brush=CreateSolidBrush(ui::raised.ToCOLORREF());return reinterpret_cast<LRESULT>(brush);}break;
     case WM_ERASEBKGND:return 1;
+    case WM_THEMECHANGED:case WM_SETTINGCHANGE:refresh();return 0;
     case WM_SIZE:if(wp!=SIZE_MINIMIZED)refresh();return 0;
     case WM_GETMINMAXINFO: {
         auto info=reinterpret_cast<MINMAXINFO*>(lp);info->ptMinTrackSize={LONG(780*app.dpi/96),LONG(560*app.dpi/96)};return 0;
@@ -1114,10 +1182,11 @@ LRESULT CALLBACK wndProc(HWND window,UINT message,WPARAM wp,LPARAM lp) {
     case ExportDone:{
         std::optional<ExportResult> result;{std::lock_guard<std::mutex> lock(app.mutex);result=std::move(app.exported);app.exported.reset();}
         app.exporting=false;
-        if(result&&result->saved){app.notice=tr(L"Kopie gespeichert: ")+result->target.filename().wstring();app.rebuildLibrary();}
+        if(result&&result->saved){app.lastExport=result->target;app.exportNotice=true;app.notice=tr(L"Kopie gespeichert: ")+result->target.filename().wstring();app.rebuildLibrary();}
         else {app.notice=tr(L"Konvertierung fehlgeschlagen");MessageBoxW(window,tr(L"Speichern fehlgeschlagen. Wähle einen anderen Dateinamen und einen beschreibbaren Ordner. Die Originaldatei kann nicht überschrieben werden."),tr(L"Bild konvertieren"),MB_OK|MB_ICONERROR);}
         SetTimer(window,3,5000,nullptr);refresh();return 0;
     }
+    case UpdateDone:refresh();return 0;
     case ThumbDone: {
         std::deque<ThumbResult> results;
         {std::lock_guard<std::mutex> lock(app.mutex);results.swap(app.thumbResults);}
@@ -1132,13 +1201,13 @@ LRESULT CALLBACK wndProc(HWND window,UINT message,WPARAM wp,LPARAM lp) {
     }
     case WM_LBUTTONDOWN: {
         if(shellNavigation()&&app.helpPage<0){auto l=viewLayout();float scale=app.dpi/96.0f,x=GET_X_LPARAM(lp)/scale,y=GET_Y_LPARAM(lp)/scale;
-            if(x>l.width-20&&y>176&&y<l.height-36){app.scrollDragging=true;SetCapture(window);int maximum=app.settings?std::max(0,int(1720-(l.height-36))):app.galleryMaxScroll;
+            if(x>l.width-20&&y>176&&y<l.height-36){app.scrollDragging=true;SetCapture(window);int maximum=app.settings?std::max(0,int(1810-(l.height-36))):app.galleryMaxScroll;
                 int position=int(std::clamp((y-176)/(l.height-212),0.0f,1.0f)*maximum);if(app.settings)app.settingsScroll=position;else app.galleryScroll=position;refresh();return 0;}}
         SetFocus(window);POINT p{GET_X_LPARAM(lp),GET_Y_LPARAM(lp)};float scale=app.dpi/96.0f;auto r=viewLayout().image;
         if(app.picture&&!app.gallery&&!app.settings&&app.helpPage<0&&RectF(r.x,r.y,r.w,r.h).Contains(p.x/scale,p.y/scale)){app.dragging=true;app.drag=p;SetCapture(window);}return 0;
     }
     case WM_MOUSEMOVE:
-        if(app.scrollDragging){auto l=viewLayout();float y=GET_Y_LPARAM(lp)/(app.dpi/96.0f);int maximum=app.settings?std::max(0,int(1720-(l.height-36))):app.galleryMaxScroll;
+        if(app.scrollDragging){auto l=viewLayout();float y=GET_Y_LPARAM(lp)/(app.dpi/96.0f);int maximum=app.settings?std::max(0,int(1810-(l.height-36))):app.galleryMaxScroll;
             int position=int(std::clamp((y-176)/(l.height-212),0.0f,1.0f)*maximum);if(app.settings)app.settingsScroll=position;else app.galleryScroll=position;refresh();return 0;}
         if(app.dragging) {
             POINT p{GET_X_LPARAM(lp),GET_Y_LPARAM(lp)};double scale=app.dpi/96.0;
@@ -1148,7 +1217,7 @@ LRESULT CALLBACK wndProc(HWND window,UINT message,WPARAM wp,LPARAM lp) {
     case WM_CAPTURECHANGED:app.scrollDragging=false;app.dragging=false;return 0;
     case WM_LBUTTONDBLCLK:if(app.picture&&!app.gallery&&!app.settings&&app.helpPage<0)command(app.fit?Actual:Fit);return 0;
     case WM_MOUSEWHEEL:
-        if(app.helpPage<0&&(app.gallery||app.settings)){int delta=GET_WHEEL_DELTA_WPARAM(wp)>0?-90:90;if(app.settings)app.settingsScroll=std::clamp(app.settingsScroll+delta,0,1720);else app.galleryScroll=std::max(0,app.galleryScroll+(delta>0?1:-1));refresh();return 0;}
+        if(app.helpPage<0&&(app.gallery||app.settings)){int delta=GET_WHEEL_DELTA_WPARAM(wp)>0?-90:90;if(app.settings)app.settingsScroll=std::clamp(app.settingsScroll+delta,0,1810);else app.galleryScroll=std::max(0,app.galleryScroll+(delta>0?1:-1));refresh();return 0;}
         if(app.picture&&!app.gallery&&!app.settings&&app.helpPage<0) {
             POINT p{GET_X_LPARAM(lp),GET_Y_LPARAM(lp)};ScreenToClient(window,&p);float scale=app.dpi/96.0f;
             auto r=viewLayout().image;
@@ -1156,18 +1225,23 @@ LRESULT CALLBACK wndProc(HWND window,UINT message,WPARAM wp,LPARAM lp) {
         }return 0;
     case WM_KEYDOWN:if(shortcut(UINT(wp)))return 0;break;
     case WM_TIMER:
+        if(wp==5&&app.preferences.autoUpdates)checkUpdates();
         if(wp==1&&!app.busy&&app.files.size()>1&&app.helpPage<0)command(Next);
         if(wp==2&&app.busy)InvalidateRect(window,nullptr,FALSE);
         if(wp==4){bool active=false;for(auto& entry:app.controls){auto& c=entry.second;float target=app.hover==entry.first?1.0f:0.0f;if(std::abs(c.hoverProgress-target)>0.01f){c.hoverProgress=motionEnabled()?c.hoverProgress+(target-c.hoverProgress)*0.28f:target;if(std::abs(c.hoverProgress-target)<0.01f)c.hoverProgress=target;InvalidateRect(c.window,nullptr,FALSE);active|=c.hoverProgress!=target;}}if(!active)KillTimer(window,4);}
         if(wp==3){app.notice.clear();KillTimer(window,3);InvalidateRect(window,nullptr,FALSE);}
         return 0;
-    case WM_CLOSE:
+    case WM_CLOSE:{
         if(!app.fullscreen&&!IsIconic(window)&&!IsZoomed(window)) {
             RECT r{};GetWindowRect(window,&r);app.preferences.width=int((r.right-r.left)*96/app.dpi);app.preferences.height=int((r.bottom-r.top)*96/app.dpi);
         }
-        app.saveSettings();DestroyWindow(window);return 0;
+        auto update=app.updates.snapshot();
+        if(update.phase==UpdatePhase::Ready&&app.installed&&(app.preferences.autoUpdates||app.installUpdateNow)){
+            if(!startUpdateHelper(app.executableDirectory/L"PAFPhotos.Update.exe",update.installer,app.executableDirectory,update.sha256,app.restartAfterUpdate)){
+                app.notice=tr(L"Update konnte nicht gestartet werden. Versuche es über Einstellungen erneut.");if(app.installUpdateNow){app.installUpdateNow=false;refresh();return 0;}}}
+        app.saveSettings();DestroyWindow(window);return 0;}
     case WM_DESTROY:
-        KillTimer(window,1);KillTimer(window,2);KillTimer(window,3);KillTimer(window,4);app.shutdown();if(app.tooltip)DestroyWindow(app.tooltip);if(app.searchFont)DeleteObject(app.searchFont);PostQuitMessage(0);return 0;
+        KillTimer(window,1);KillTimer(window,2);KillTimer(window,3);KillTimer(window,4);KillTimer(window,5);app.shutdown();if(app.tooltip)DestroyWindow(app.tooltip);if(app.searchFont)DeleteObject(app.searchFont);PostQuitMessage(0);return 0;
     }
     return DefWindowProcW(window,message,wp,lp);
 }
@@ -1196,9 +1270,15 @@ int selfTest(const fs::path& report) {
     std::ofstream log(report);int passed=0;
     auto check=[&](bool ok,const char* name){log<<(ok?"PASS ":"FAIL ")<<name<<"\n";log.flush();if(ok)++passed;return ok;};
     TempDirectory temp;if(temp.path.empty())return 2;
+    auto hashFile=temp.path/L"hash.txt";{std::ofstream data(hashFile,std::ios::binary);data<<"abc";}
+    bool hashCorrect=updateHash(hashFile)=="ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
+    check(hashCorrect,"Updater SHA256 matches independent known vector");
+    {std::ofstream data(hashFile,std::ios::binary);data<<"abd";}
+    bool tamperCorrect=updateHash(hashFile)!="ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"&&updateHash(temp.path/L"missing.exe").empty();
+    check(tamperCorrect,"Updater detects changed and missing files");
     Com<IWICImagingFactory> factory;
     if(FAILED(CoCreateInstance(CLSID_WICImagingFactory,nullptr,CLSCTX_INPROC_SERVER,IID_PPV_ARGS(factory.out()))))return 3;
-    bool success=true;
+    bool success=hashCorrect&&tamperCorrect;
     const std::pair<const wchar_t*,GUID> formats[]={{L"png",GUID_ContainerFormatPng},{L"jpg",GUID_ContainerFormatJpeg},{L"bmp",GUID_ContainerFormatBmp},{L"tiff",GUID_ContainerFormatTiff}};
     for(const auto& format:formats) {
         auto path=temp.path/(L"Bilder ü 日本語."+std::wstring(format.first));
@@ -1256,7 +1336,7 @@ int selfTest(const fs::path& report) {
     success &=check(foto::recognized("UPPER.PNG") && !foto::recognized("image.png.exe"),"Extension registry");
     WNDCLASSEXW wc{};wc.cbSize=sizeof(wc);wc.lpfnWndProc=wndProc;wc.hInstance=GetModuleHandleW(nullptr);wc.lpszClassName=AppClass;wc.hCursor=LoadCursorW(nullptr,IDC_ARROW);wc.style=CS_DBLCLKS;
     if(RegisterClassExW(&wc)) {
-        HWND window=CreateWindowExW(0,AppClass,L"Photo VLC · UI-Test",WS_OVERLAPPEDWINDOW|WS_CLIPCHILDREN,0,0,1180,800,nullptr,nullptr,wc.hInstance,nullptr);
+        HWND window=CreateWindowExW(0,AppClass,L"PAF-Photos · UI-Test",WS_OVERLAPPEDWINDOW|WS_CLIPCHILDREN,0,0,1180,800,nullptr,nullptr,wc.hInstance,nullptr);
         success &=check(window!=nullptr,"Create desktop window");
         if(window) {
             ShowWindow(window,SW_SHOW);
@@ -1275,6 +1355,9 @@ int selfTest(const fs::path& report) {
             success &=check(conversionQueued&&app.exporting&&!IsWindowEnabled(app.controls[Export].window),"Conversion queues in background and disables duplicate export");
             command(Mirror);pump();command(Mirror);auto asynchronousDecoded=embeddedLoad(asynchronousCopy);
             success &=check(!app.exporting&&asynchronousDecoded.image&&asynchronousDecoded.image->width==2,"Background conversion completes while controls remain usable");
+            success &=check(app.exportNotice&&app.lastExport==asynchronousCopy&&IsWindowVisible(app.controls[OpenSaved].window)&&IsWindowVisible(app.controls[RevealSaved].window),"Saved copy exposes persistent destination and open/reveal buttons");
+            command(OpenSaved);pump();success &=check(app.files[app.index]==asynchronousCopy&&app.picture&&!app.exportNotice,"Open saved copy navigates to actual converted file");
+            app.openPath(temp.path/L"Bilder ü 日本語.png");pump();
             success &=check(app.files.size()>=5,"Folder image discovery");
             auto two=std::find(app.files.begin(),app.files.end(),temp.path/L"Bild 2.png");
             auto ten=std::find(app.files.begin(),app.files.end(),temp.path/L"Bild 10.png");
@@ -1310,10 +1393,10 @@ int selfTest(const fs::path& report) {
             bool hasPreview=false;for(const auto& entry:app.thumbs)if(entry.second)hasPreview=true;
             success &=check(hasPreview,"Real asynchronous image thumbnails");
             success &=check(!app.preferences.recent.empty() && app.preferences.recent.front()==app.files[app.index],"Recent successful image");
-            auto preferencesFile=temp.path/L"settings.ini";Preferences saved;saved.details=true;saved.strip=false;saved.width=1110;saved.accent=RGB(160,75,235);saved.radius=0;saved.animations=false;saved.recursive=true;saved.quality=90;
+            auto preferencesFile=temp.path/L"settings.ini";Preferences saved;saved.details=true;saved.strip=false;saved.width=1110;saved.accent=RGB(160,75,235);saved.radius=0;saved.animations=false;saved.recursive=true;saved.quality=90;saved.autoUpdates=false;
             saved.remember(temp.path/L"Bilder ü 日本語.png");saved.write(preferencesFile);Preferences restored;restored.read(preferencesFile);
             success &=check(restored.details&&!restored.strip&&restored.width==1110&&restored.recent==saved.recent,"Preferences and Unicode recent paths persist");
-            success &=check(restored.accent==saved.accent&&restored.radius==0&&!restored.animations&&restored.recursive&&restored.quality==90,"Color, radius, motion, recursive gallery and export quality persist");
+            success &=check(restored.accent==saved.accent&&restored.radius==0&&!restored.animations&&restored.recursive&&restored.quality==90&&!restored.autoUpdates,"Color, radius, motion, recursive gallery and export quality persist");
             command(Mirror);success &=check(app.mirrored,"Mirror viewer");command(ResetView);success &=check(!app.mirrored&&app.rotation==0&&app.fit,"Reset transforms");
             command(About);success &=check(app.helpPage==0&&IsWindowVisible(app.controls[ReleasePage].window),"About and version page");
             command(HelpKeys);success &=check(app.helpPage==1,"Keyboard help page");
@@ -1352,6 +1435,14 @@ int selfTest(const fs::path& report) {
             command(612);success &=check(ui::background.GetR()>240,"Light theme palette");command(611);success &=check(ui::background.GetR()<50,"Dark theme palette");
             command(621);app.openPath(temp.path/L"Bild 2.png");pump();success &=check(!app.fit&&app.zoom==1,"Persisted actual-size opening preference");command(620);
             command(Settings);SendMessageW(window,WM_MOUSEWHEEL,MAKEWPARAM(0,-WHEEL_DELTA),0);success &=check(app.settingsScroll>0,"Settings scrolling");
+            bool scrollPaint=true;
+            for(int step=0;step<30;++step){SendMessageW(window,WM_MOUSEWHEEL,MAKEWPARAM(0,step<15?-WHEEL_DELTA:WHEEL_DELTA),0);
+                for(const auto& entry:app.controls)if(entry.second.visible&&entry.first!=Search){HWND button=entry.second.window;RECT area{};GetClientRect(button,&area);
+                    HDC screen=GetDC(button),memory=CreateCompatibleDC(screen);HBITMAP bitmap=CreateCompatibleBitmap(screen,area.right,area.bottom);auto old=SelectObject(memory,bitmap);
+                    PatBlt(memory,0,0,area.right,area.bottom,WHITENESS);SendMessageW(button,WM_PRINTCLIENT,reinterpret_cast<WPARAM>(memory),PRF_CLIENT);
+                    scrollPaint&=SendMessageW(button,WM_ERASEBKGND,reinterpret_cast<WPARAM>(memory),0)==1&&GetPixel(memory,area.right/2,2)!=RGB(255,255,255);
+                    SelectObject(memory,old);DeleteObject(bitmap);DeleteDC(memory);ReleaseDC(button,screen);}}
+            success &=check(scrollPaint,"Rapid dark settings scroll paints native buttons without white erase or print backgrounds");
             command(Maximize);success &=check(IsZoomed(window),"Integrated title-bar maximize");command(Maximize);success &=check(!IsZoomed(window),"Integrated title-bar restore");
             command(Gallery);command(NavToggle);
             success &=check(app.navExpanded&&app.controls[Gallery].box.w>180,"Expanded navigation");
@@ -1399,6 +1490,16 @@ int codecSelfTest(const fs::path& directory,const fs::path& report){
     log<<passed<<" codec checks passed\n";return success?0:1;
 }
 
+int updateSelfTest(const fs::path& report){
+    std::ofstream log(report);TempDirectory temp;UpdateService service;
+    if(temp.path.empty()||!service.start(nullptr,0,"0.0.0",temp.path,true))return 2;
+    DWORD began=GetTickCount();UpdateSnapshot state;
+    do{Sleep(50);state=service.snapshot();}while(state.phase!=UpdatePhase::Ready&&state.phase!=UpdatePhase::Failed&&GetTickCount()-began<120000);
+    service.stop();bool good=state.phase==UpdatePhase::Ready&&state.version==FOTO_VERSION_STRING&&updateHash(state.installer)==state.sha256;
+    log<<(good?"PASS ":"FAIL ")<<"Published HTTPS manifest, version comparison, actual setup download and SHA256 verification\n";
+    log<<"Version "<<state.version<<"\nSHA256 "<<state.sha256<<"\n";return good?0:1;
+}
+
 int WINAPI wWinMain(HINSTANCE instance,HINSTANCE,PWSTR,int show) {
     HRESULT co=CoInitializeEx(nullptr,COINIT_APARTMENTTHREADED);
     GdiplusStartupInput startup;ULONG_PTR token=0;
@@ -1406,11 +1507,12 @@ int WINAPI wWinMain(HINSTANCE instance,HINSTANCE,PWSTR,int show) {
     INITCOMMONCONTROLSEX controls{sizeof(controls),ICC_WIN95_CLASSES};InitCommonControlsEx(&controls);
     SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
     int argc=0;LPWSTR* args=CommandLineToArgvW(GetCommandLineW(),&argc);
+    if(argc>2&&std::wstring(args[1])==L"--update-test"){int result=updateSelfTest(args[2]);LocalFree(args);GdiplusShutdown(token);if(SUCCEEDED(co))CoUninitialize();return result;}
     if(argc>3&&std::wstring(args[1])==L"--codec-test"){foto::english=true;int result=codecSelfTest(args[2],args[3]);LocalFree(args);ui::releaseBrand();GdiplusShutdown(token);if(SUCCEEDED(co))CoUninitialize();return result;}
     if(argc>1&&std::wstring(args[1])==L"--self-test") {
         int result=selfTest(argc>2?fs::path(args[2]):fs::path(L"self-test.txt"));LocalFree(args);ui::releaseBrand();GdiplusShutdown(token);if(SUCCEEDED(co))CoUninitialize();return result;
     }
-    app.initSettings();
+    app.initSettings();wchar_t executable[32768]{};GetModuleFileNameW(nullptr,executable,32768);app.executableDirectory=fs::path(executable).parent_path();app.installed=installedApp(app.executableDirectory);
     WNDCLASSEXW wc{};wc.cbSize=sizeof(wc);wc.style=CS_DBLCLKS;wc.lpfnWndProc=wndProc;wc.hInstance=instance;wc.lpszClassName=AppClass;
     wc.hCursor=LoadCursorW(nullptr,IDC_ARROW);wc.hIcon=LoadIconW(instance,MAKEINTRESOURCEW(2));wc.hIconSm=wc.hIcon;
     if(!RegisterClassExW(&wc)){LocalFree(args);ui::releaseBrand();GdiplusShutdown(token);if(SUCCEEDED(co))CoUninitialize();return 1;}
@@ -1423,6 +1525,7 @@ int WINAPI wWinMain(HINSTANCE instance,HINSTANCE,PWSTR,int show) {
     ShowWindow(window,show);UpdateWindow(window);
     if(argc>1)app.openPath(args[1]);
     LocalFree(args);
+    SetTimer(window,5,24u*60*60*1000,nullptr);if(app.preferences.autoUpdates)checkUpdates();
     MSG message{};int status;
     while((status=GetMessageW(&message,nullptr,0,0))>0) {
         dispatchMessage(message);

@@ -1,17 +1,17 @@
-# Photo VLC
+# PAF-Photos
 
 Ein kleiner, nativer Foto-Betrachter für **Windows 10/11 x64**, geschrieben in
 C++17. Galerie mit Suche und Favoriten, deutsche und englische Oberfläche,
 System-/Hell-/Dunkel-Design, keine Browser-Runtime und kein Account.
 
-> **Photo VLC 0.4.0** ist eine Galerie und ein Foto-Betrachter. Die Unterstützung für jedes
-> Design-, CAD- oder Spieleformat ist noch nicht vollständig. Alle 194 Endungen sind im
+> **PAF-Photos 0.5.0** ist eine Galerie und ein Foto-Betrachter. Die Unterstützung für jedes
+> Design-, CAD- oder Spieleformat ist noch nicht vollständig. Alle 195 erfassten Endungen sind im
 > Dateifilter erfasst; die tatsächliche Unterstützung steht in
 > [docs/formats.md](docs/formats.md).
 
-![Photo VLC gallery](docs/screenshot.png)
+![PAF-Photos gallery](docs/screenshot.png)
 
-![Photo VLC settings](docs/screenshot-settings.png)
+![PAF-Photos settings](docs/screenshot-settings.png)
 
 Die Abbildung zeigt den tatsächlichen Windows-Build unter Wine.
 Bildnachweise für die gezeigten Testfotos: [docs/screenshots.md](docs/screenshots.md).
@@ -21,9 +21,9 @@ Bildnachweise für die gezeigten Testfotos: [docs/screenshots.md](docs/screensho
 Unter [Releases](https://github.com/Lyvt-Dev/Photo-VLC/releases) gibt es
 `setup.exe` für eine Installation ohne Administratorrechte mit Codecs, Startmenü-Eintrag,
 optionalem Desktop-Symbol und „Öffnen mit“-Registrierung. Alternativ gibt es
-`PhotoVLC-Windows-x64.zip` als vollständige portable App mit zusätzlichen Decodern.
-ZIP vollständig entpacken und `PhotoVLC.exe` starten. Das `codecs`-Verzeichnis
-bleibt neben der EXE. Die einzelne `PhotoVLC.exe` ist der kleinere Download
+`PAFPhotos-Windows-x64.zip` als vollständige portable App mit zusätzlichen Decodern.
+ZIP vollständig entpacken und `PAFPhotos.exe` starten. Das `codecs`-Verzeichnis
+bleibt neben der EXE. Die einzelne `PAFPhotos.exe` ist der kleinere Download
 mit eingebauten Decodern und Unterstützung für installierte Windows-Codecs. Die EXE benötigt keine Installation und keine zusätzliche
 C++-Runtime. Der Build ist bislang nicht mit einem Code-Signing-Zertifikat
 signiert. Die Prüfsumme steht im jeweiligen Release.
@@ -42,7 +42,7 @@ signiert. Die Prüfsumme steht im jeweiligen Release.
 - Galerie mit mehreren Bilderordnern, Suche nach Dateiname/Endung und drei Vorschaugrößen.
 - Favoriten, Mehrfachauswahl und ausklappbare Navigation.
 - Einstellungen mit Deutsch/Englisch/Systemsprache, System-/Hell-/Dunkel-Design und Zoom-Voreinstellung.
-- Automatische Übernahme der bisherigen Foto-VLC-Einstellungen.
+- Automatische Übernahme der bisherigen Photo-VLC-/Foto-VLC-Einstellungen.
 - Kompakte Werkzeugleiste, native Windows-Schaltflächen und Hinweise beim Darüberfahren.
 - Anpassen, Originalgröße, Zoom auf die Mausposition und Verschieben durch Ziehen.
 - Doppelklick wechselt zwischen angepasster Ansicht und Originalgröße.
@@ -60,7 +60,7 @@ signiert. Die Prüfsumme steht im jeweiligen Release.
 
 Originaldateien werden nicht verändert. Drehen und Zoom betreffen nur die Anzeige.
 GIFs, APNGs und mehrseitige Dateien zeigen die erste decodierbare Seite; Animation
-und Ebenenbearbeitung gehören nicht zu v0.3. Die Diashow wechselt zwischen Dateien.
+und Ebenenbearbeitung gehören nicht zu v0.5. Die Diashow wechselt zwischen Dateien.
 
 ## Bedienung
 
@@ -84,7 +84,7 @@ und Ebenenbearbeitung gehören nicht zu v0.3. Die Diashow wechselt zwischen Date
 Ein Dateipfad kann auch als Startargument übergeben werden:
 
 ```powershell
-.\PhotoVLC.exe 'C:\Fotos\Mein Bild.png'
+.\PAFPhotos.exe 'C:\Fotos\Mein Bild.png'
 ```
 
 ## Zusätzliche Decoder
@@ -93,13 +93,13 @@ Das vollständige ZIP enthält bereits ein portables **ImageMagick 7.1.2-33** in
 `codecs/`. Es wird ohne zusätzliche Installation erkannt. Lizenz, Herkunft,
 getestete Formate und das separate Quellcodepaket stehen in [docs/codecs.md](docs/codecs.md).
 Wer nur die einzelne EXE verwendet, kann zusätzlich ImageMagick installieren:
-https://imagemagick.org/script/download.php#windows . Photo VLC findet
-`magick.exe` neben der App in `codecs/`, im PATH oder über `PHOTO_VLC_MAGICK`.
-Die bisherige Variable `FOTO_VLC_MAGICK` bleibt kompatibel.
+https://imagemagick.org/script/download.php#windows . PAF-Photos findet
+`magick.exe` neben der App in `codecs/`, im PATH oder über `PAF_PHOTOS_MAGICK`.
+Die bisherige Variable `FOTO_VLC_MAGICK` und `PHOTO_VLC_MAGICK` bleiben kompatibel.
 
 ```powershell
-$env:PHOTO_VLC_MAGICK = 'C:\Program Files\ImageMagick-7.x.x-Q16-HDRI\magick.exe'
-.\PhotoVLC.exe
+$env:PAF_PHOTOS_MAGICK = 'C:\Program Files\ImageMagick-7.x.x-Q16-HDRI\magick.exe'
+.\PAFPhotos.exe
 ```
 
 Das ist ein Beispielpfad; verwende den tatsächlichen Installationspfad. Unter
@@ -113,7 +113,7 @@ zeigen eine verständliche Fehlermeldung.
 
 Galerieordner, Favoriten, Sprache, Design, Ansichtsoptionen und zuletzt
 erfolgreich geöffnete Bilder liegen ausschließlich
-auf diesem Gerät unter `%LOCALAPPDATA%\PhotoVLC\settings.ini`. Der Verlauf lässt
+auf diesem Gerät unter `%LOCALAPPDATA%\PAFPhotos\settings.ini`. Der Verlauf lässt
 sich in den Einstellungen löschen. Die Galerie kopiert keine Fotos und das
 Entfernen eines Galerieordners löscht keine Dateien. Pro hinzugefügtem Ordner
 werden direkt enthaltene Bilder erfasst; Unterordner können separat ergänzt
@@ -129,12 +129,12 @@ Mit Visual Studio 2022 Build Tools, Windows SDK und CMake ≥ 3.20:
 cmake -S . -B build -A x64
 cmake --build build --config Release --parallel 2
 ctest --test-dir build -C Release --output-on-failure
-$p = Start-Process build/Release/PhotoVLC.exe -ArgumentList '--self-test','windows-self-test.txt' -Wait -PassThru
+$p = Start-Process build/Release/PAFPhotos.exe -ArgumentList '--self-test','windows-self-test.txt' -Wait -PassThru
 Get-Content windows-self-test.txt
 if ($p.ExitCode -ne 0) { throw 'Windows self-test failed' }
 ```
 
-Die EXE liegt anschließend in `build/Release/PhotoVLC.exe`. MSVC-Runtime und die
+Die EXE liegt anschließend in `build/Release/PAFPhotos.exe`. MSVC-Runtime und die
 kleinen Decoder werden statisch eingebunden; nur Windows-System-DLLs werden benötigt.
 
 Unter Linux lassen sich die portablen Decoder- und Core-Tests ausführen:
@@ -173,7 +173,7 @@ Ressourcenbegrenzung, keine vollständige Sandbox.
 
 Die App verarbeitet maximal 512 MiB große Eingabedateien; die eingebetteten
 Decoder haben ein 128-MiB-Dateilimit, SVG ein 8-MiB-Limit. Keine garantierte
-farbverbindliche Darstellung, keine HDR-Ausgabe, kein Export, kein Editor.
+farbverbindliche Darstellung, keine HDR-Ausgabe und keine Ebenenbearbeitung.
 Die Oberfläche verwendet native Windows-Schaltflächen mit zugänglichen Namen
 und Tastaturfokus. Eine vollständige Screenreader-Prüfung steht noch aus.
 
@@ -181,7 +181,9 @@ und Tastaturfokus. Eine vollständige Screenreader-Prüfung steht noch aus.
 
 ## Konvertieren und Installer bauen
 
-„Konvertieren“ öffnet den Windows-Speicherdialog mit fünf echten Ausgabeformaten.
+„Konvertieren“ lässt zuerst PNG, JPEG, BMP, TIFF oder WebP auswählen und öffnet danach den Windows-Speicherdialog. Standardziel ist der Ordner des Originals.
+Nach dem Speichern zeigt eine dauerhafte Bestätigung den vollständigen Pfad,
+„Kopie öffnen“ und „Im Ordner anzeigen“.
 Die Endung wird dem gewählten Format angepasst. PNG und WebP bewahren Transparenz;
 JPEG und BMP verwenden einen weißen Hintergrund. Exportiert wird das dekodierte Raster
 mit Drehung/Spiegelung, ohne Projekt-Ebenen oder Quell-Metadaten. Bei verkleinerten
@@ -189,10 +191,28 @@ Vorschauen und Animationen/mehrseitigen Dateien weist die App auf die Pixelmaße
 beziehungsweise den Export des ersten Bildes hin. Der PNG/WebP-Export ist verlustfrei
 für das dekodierte Raster; eine JPEG-Quelldatei wird dabei nicht verlustfrei umcodiert.
 
-Der Release-Workflow baut `installer/PhotoVLC.iss` mit Inno Setup 6 aus demselben
+Der Release-Workflow baut `installer/PAFPhotos.iss` mit Inno Setup 6 aus demselben
 Payload wie die portable ZIP. Er prüft eine stille Installation, den installierten
 Codec-Pfad, die „Öffnen mit“-Registrierung und eine stille Deinstallation.
-Die Anwendung legt Einstellungen getrennt unter `%LOCALAPPDATA%\PhotoVLC` ab;
+Die Anwendung legt Einstellungen getrennt unter `%LOCALAPPDATA%\PAFPhotos` ab;
 diese bleiben bei der Deinstallation erhalten.
 
 Die Konvertierung läuft im Hintergrund; die Bildansicht bleibt während des Speicherns bedienbar.
+
+## Automatische Updates
+
+Ab 0.5.0 prüft die App beim Start und danach alle 24 Stunden das neueste GitHub-Release.
+Installierte Apps laden neue Versionen im Hintergrund, prüfen Größe und SHA256 und
+installieren sie beim Beenden ohne Administratorrechte. Unter Einstellungen lässt sich
+„Automatische Updates“ abschalten oder eine fertige Version mit „Jetzt installieren“
+installieren; dabei startet die App neu. Einstellungen und Galerie bleiben erhalten.
+Offline kann die App weiterhin verwendet werden; die Prüfung lässt sich später wiederholen.
+Portable Apps zeigen verfügbare Versionen an und führen zum Release-Download.
+Für den Wechsel von 0.4.0 muss dieses Setup einmal manuell ausgeführt werden, da die
+alte Version noch keinen Updater besitzt. Der bisherige Installationsort wird übernommen.
+Das P-Logo bleibt erhalten; App, Setup, Verknüpfungen und EXE heißen jetzt PAF-Photos.
+Der Repository-Name bleibt aus Kompatibilitätsgründen Photo-VLC.
+
+Die App übermittelt für Updates nur HTTPS-Anfragen an GitHub und dessen Asset-Server;
+Bilder und Galeriepfade werden nicht übertragen. Prüfsummen schützen vor beschädigten
+Downloads; sie ersetzen keine digitale Herausgebersignatur.

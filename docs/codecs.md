@@ -1,9 +1,9 @@
 # Additional image formats
 
-The **PhotoVLC-Windows-x64.zip** download contains a portable ImageMagick
-7.1.2-33 Q8 x64 runtime in `codecs/`. Photo VLC discovers it automatically;
+The **PAFPhotos-Windows-x64.zip** download contains a portable ImageMagick
+7.1.2-33 Q8 x64 runtime in `codecs/`. PAF-Photos discovers it automatically;
 no installation, PATH changes or account are required. Keep that directory
-next to `PhotoVLC.exe`. The standalone EXE uses built-in decoders and installed
+next to `PAFPhotos.exe`. The standalone EXE uses built-in decoders and installed
 Windows codecs; it can also discover a separately installed ImageMagick.
 
 The runtime is an unmodified upstream program by **ImageMagick Studio LLC**,
@@ -24,7 +24,7 @@ are not universally readable. Animation/multipage viewing currently shows one
 frame/page. See FORMATS.md for the complete list and restrictions.
 
 Corresponding upstream source/build trees are provided separately in
-**PhotoVLC-Codec-Sources.zip** on the same release page. They are not required
+**PAFPhotos-Codec-Sources.zip** on the same release page. They are not required
 to run the app. That archive includes ImageMagick, its Configure tool and
 all exact dependency source revisions from the upstream build recipe,
 with original license notices and a manifest of archive checksums.

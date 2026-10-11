@@ -1,11 +1,11 @@
-# Photo VLC 0.4.0
+# PAF-Photos 0.5.0
 
 A portable photo gallery and image viewer for Windows 10/11 (64-bit).
 
 ## Get started / Loslegen
 
 1. Extract the entire ZIP into a folder / ZIP vollständig in einen Ordner entpacken.
-2. Start **PhotoVLC.exe**.
+2. Start **PAFPhotos.exe**.
 3. Choose **Folder / Ordner** to add your photo folders to the gallery.
 4. Click a thumbnail to open a photo, or drag a file into the window.
 
@@ -32,7 +32,9 @@ button changes thumbnail size. Scroll to browse more images.
 ## Convert and personalize
 
 Open a photo and choose **Convert** or press Ctrl+S. Select PNG, JPEG, BMP, TIFF or WebP
-in the Save dialog: Photo VLC actually encodes that format and sets its extension.
+first, then choose the destination in the Save dialog. The source folder is the default.
+After saving, a persistent card shows the full path and offers **Open copy** and
+**Show in folder**. PAF-Photos actually encodes the selected format and sets its extension.
 The original cannot be overwritten. Rotation and mirroring are included.
 PNG/WebP preserve alpha; JPEG/BMP use white behind transparency. WebP is lossless.
 Export uses the decoded raster without source metadata or project layers. If a large
@@ -72,7 +74,7 @@ Viewing, zooming, rotating and favoriting do not change your original files.
 ## Local preferences
 
 Folders, favorites, viewing preferences and recent images are stored in
-`%LOCALAPPDATA%\PhotoVLC\settings.ini`. Existing Foto VLC settings are migrated.
+`%LOCALAPPDATA%\PAFPhotos\settings.ini`. Existing Photo VLC / Foto VLC settings are migrated.
 No account or telemetry is required. Removing a gallery folder does not delete
 its files. Clear the recent-image list in Settings.
 
@@ -81,3 +83,11 @@ New versions: https://github.com/Lyvt-Dev/Photo-VLC/releases
 MIT license: LICENSE. Third-party terms: THIRD_PARTY_NOTICES.md and codecs/NOTICE.txt.
 
 Image conversion runs in the background; viewing controls stay responsive during encoding.
+
+## Updates
+
+Installed apps check GitHub on startup and daily, download and verify new setups, then
+install on exit. Turn this off in Settings, or use Check for updates / Install now.
+Portable apps open the release page to download updates. Coming from 0.4.0? Run the
+new setup once; older versions cannot update automatically. The P logo is retained,
+but application branding, shortcuts and executable names now use PAF-Photos.

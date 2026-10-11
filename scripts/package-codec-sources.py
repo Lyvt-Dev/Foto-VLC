@@ -36,7 +36,7 @@ components = list(dict.fromkeys(re.findall(r"clone '([^']+)' '([0-9a-f]{40})'", 
 with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
     archives.extend(pool.map(lambda entry: fetch(*entry), components))
 Path("dist").mkdir(exist_ok=True)
-with zipfile.ZipFile("dist/PhotoVLC-Codec-Sources.zip", "w", compression=zipfile.ZIP_STORED) as output:
+with zipfile.ZipFile("dist/PAFPhotos-Codec-Sources.zip", "w", compression=zipfile.ZIP_STORED) as output:
     manifest = []
     for archive, (repo, ref) in zip(archives, base + components):
         output.write(archive, "archives/" + archive.name)
@@ -44,10 +44,10 @@ with zipfile.ZipFile("dist/PhotoVLC-Codec-Sources.zip", "w", compression=zipfile
                          "sha256": hashlib.sha256(archive.read_bytes()).hexdigest()})
     output.writestr("MANIFEST.json", json.dumps(manifest, indent=2))
     output.writestr("README.txt", """Corresponding source for ImageMagick 7.1.2-33 portable Q8 x64.
-Photo VLC invokes this unmodified upstream program as a separate process.
+PAF-Photos invokes this unmodified upstream program as a separate process.
 These archives contain the original source, copyright/license notices, and build
 scripts for ImageMagick, its Configure tool and all pinned dependency trees.
-No source patches were applied by Photo VLC.
+No source patches were applied by PAF-Photos.
 
 Extract ImageMagick and Configure alongside Dependencies. Extract component
 archives beneath Dependencies/Dependencies using their repository names, as
@@ -55,7 +55,7 @@ specified in Dependencies/clone-dependencies.sh. Follow the Windows build
 instructions in the ImageMagick and Dependencies source trees. The Configure
 source and ImageMagick/.github/build/windows scripts supply project generation,
 compiler configuration and link settings. The portable binary was built upstream;
-Photo VLC does not claim to have built it.
+PAF-Photos does not claim to have built it.
 
 Upstream binary and SBOM:
 https://github.com/ImageMagick/ImageMagick/releases/tag/7.1.2-33
@@ -63,7 +63,7 @@ Build dependency release:
 https://github.com/ImageMagick/Dependencies/releases/tag/2026.10.09.2225
 Source manifests pin every component and record archive SHA-256 values.
 License texts for the binary runtime are in codecs/LICENSE.txt and
-codecs/NOTICE.txt in PhotoVLC-Windows-x64.zip; each source archive includes
+codecs/NOTICE.txt in PAFPhotos-Windows-x64.zip; each source archive includes
 its original licensing information.
 """)
-print("Packaged", len(archives), "source trees:", Path("dist/PhotoVLC-Codec-Sources.zip").stat().st_size, "bytes")
+print("Packaged", len(archives), "source trees:", Path("dist/PAFPhotos-Codec-Sources.zip").stat().st_size, "bytes")

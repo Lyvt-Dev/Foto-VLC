@@ -1,20 +1,14 @@
-Photo VLC 0.4.0 adds a Windows installer, a distinct identity and real image conversion.
+PAF-Photos 0.5.0 replaces the previous Photo VLC branding and makes saving and updates easier.
 
-- Original cyan/violet aperture-P logo, a cool charcoal palette and flat buttons without bevels or toolbar shadows.
-- Choose any accent color, a 0–16 px corner radius and light/dark/system themes. Settings persist across restarts.
-- Smooth button hover animations; optional and respectful of Windows reduced-motion preferences.
-- **Convert** (Ctrl+S): save a copy as PNG, JPEG, BMP, TIFF or lossless WebP. Output extension follows the selected encoder. JPEG quality is configurable; PNG/WebP preserve transparency, JPEG/BMP use a white background.
-- Horizontal mirror (M), reset view and copy the transformed image to the clipboard (Ctrl+C, white background).
-- Conversion includes rotation and mirroring and refuses to overwrite the source. Large decoded previews and animation/multipage exports show a notice: only the displayed raster / first frame is exported, without project layers or source metadata.
-- Optional subfolder scanning (up to 10,000 gallery images, no traversal of directory links).
-- German and English interface and installer; visible version information.
+- PAF-Photos branding throughout the app, executable, installer, shortcuts and Windows metadata. The original aperture-P logo remains. Existing installation and settings migrate.
+- Fixed white button backgrounds during scrolling: controls repaint their complete surface, and layout changes redraw the parent and children together.
+- Conversion now asks for the output format first, defaults to the original folder and keeps a confirmation with the full saved path, Open copy and Show in folder. PNG, JPEG, BMP, TIFF and lossless WebP are encoded in the background.
+- Automatic updates for installed apps: checks on startup and daily, bounded HTTPS downloads, version and SHA256 verification, installation after exit, and an optional Install now action. Updates can be disabled. Portable builds offer the release download.
 
-Download **setup.exe** for a per-user installation with codecs, Start menu shortcut, optional desktop shortcut and an Open With registration. No admin account is required. Default photo associations are not changed. Uninstall removes the app and its registration while preserving your preferences.
+**Install setup.exe once to move from 0.4.0:** previous versions have no updater. Installation is per user, needs no admin account, retains your settings and leaves default photo associations unchanged.
 
-**PhotoVLC-Windows-x64.zip** is the complete portable alternative. Extract the whole ZIP and launch PhotoVLC.exe; keep `codecs` beside it. The individual PhotoVLC.exe includes fewer decoders. Neither build is digitally signed.
+The full **PAFPhotos-Windows-x64.zip** includes the codecs and update helper. Extract the complete ZIP; keep codecs beside PAFPhotos.exe. The individual EXE supports fewer formats. Builds are currently unsigned.
 
-Windows UI and conversion tests, actual codec pixel tests, silent install/uninstall checks and checksums accompany the release. Recognized extensions are not a promise that every proprietary project format can be decoded; see the format guide. Animation and multipage viewing still show the first frame/page.
+Windows rendering, five-format conversion, actual codec pixels and thumbnails, install/uninstall, updater checksum rejection and installation checks accompany this release. After publication, a Windows test checks the actual HTTPS manifest and setup download. Recognized extensions do not guarantee decoding every proprietary format; see the format guide. Animation and multipage viewing show the first frame/page; conversion exports the displayed raster without project layers or source metadata.
 
-The optional **PhotoVLC-Codec-Sources.zip** contains corresponding source archives and license information for the bundled codec runtime; it is not needed to run the app.
-
-Image conversion runs in the background; viewing controls stay responsive during encoding.
+The optional PAFPhotos-Codec-Sources.zip contains corresponding codec sources and licenses and is not needed to run the app.
