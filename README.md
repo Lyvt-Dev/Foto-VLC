@@ -1,23 +1,28 @@
-# Foto VLC
+# Photo VLC
 
 Ein kleiner, nativer Foto-Betrachter für **Windows 10/11 x64**, geschrieben in
-C++17. Dunkle Oberfläche, keine Browser-Runtime, kein Account und keine Telemetrie.
+C++17. Galerie mit Suche und Favoriten, deutsche und englische Oberfläche,
+System-/Hell-/Dunkel-Design, keine Browser-Runtime und kein Account.
 
-> **Foto VLC 0.2.0** ist ein Foto-Betrachter. Die Unterstützung für jedes
+> **Photo VLC 0.3.0** ist eine Galerie und ein Foto-Betrachter. Die Unterstützung für jedes
 > Design-, CAD- oder Spieleformat ist noch nicht vollständig. Alle 194 Endungen sind im
 > Dateifilter erfasst; die tatsächliche Unterstützung steht in
 > [docs/formats.md](docs/formats.md).
 
-![Foto VLC mit geöffnetem Bild](docs/screenshot.png)
+![Photo VLC gallery](docs/screenshot.png)
+
+![Photo VLC settings](docs/screenshot-settings.png)
 
 Die Abbildung zeigt den tatsächlichen Windows-Build unter Wine.
 Bildnachweise für die gezeigten Testfotos: [docs/screenshots.md](docs/screenshots.md).
 
 ## Download
 
-Unter [Releases](https://github.com/Lyvt-Dev/Foto-VLC/releases) gibt es nach einem
-bestandenen Release-Build `FotoVLC.exe` und ein portables ZIP mit Lizenz- und
-Formatinformationen. Die EXE benötigt keine Installation und keine zusätzliche
+Unter [Releases](https://github.com/Lyvt-Dev/Foto-VLC/releases) gibt es
+`PhotoVLC-Windows-x64.zip` als vollständige portable App mit zusätzlichen Decodern.
+ZIP vollständig entpacken und `PhotoVLC.exe` starten. Das `codecs`-Verzeichnis
+bleibt neben der EXE. Die einzelne `PhotoVLC.exe` ist der kleinere Download
+mit eingebauten Decodern und Unterstützung für installierte Windows-Codecs. Die EXE benötigt keine Installation und keine zusätzliche
 C++-Runtime. Der Build ist bislang nicht mit einem Code-Signing-Zertifikat
 signiert. Die Prüfsumme steht im jeweiligen Release.
 
@@ -25,7 +30,10 @@ signiert. Die Prüfsumme steht im jeweiligen Release.
 
 - Datei oder Ordner öffnen; Dateien und Ordner per Drag-and-drop laden.
 - Filmstreifen mit echten Vorschaubildern und natürlicher Dateisortierung (Bild 2 vor Bild 10).
-- Startseite mit den vier zuletzt geöffneten Bildern.
+- Galerie mit mehreren Bilderordnern, Suche nach Dateiname/Endung und drei Vorschaugrößen.
+- Favoriten, Mehrfachauswahl und ausklappbare Navigation.
+- Einstellungen mit Deutsch/Englisch/Systemsprache, System-/Hell-/Dunkel-Design und Zoom-Voreinstellung.
+- Automatische Übernahme der bisherigen Foto-VLC-Einstellungen.
 - Kompakte Werkzeugleiste, native Windows-Schaltflächen und Hinweise beim Darüberfahren.
 - Anpassen, Originalgröße, Zoom auf die Mausposition und Verschieben durch Ziehen.
 - Doppelklick wechselt zwischen angepasster Ansicht und Originalgröße.
@@ -37,12 +45,13 @@ signiert. Die Prüfsumme steht im jeweiligen Release.
 - Transparenzraster, Unicode-Dateinamen und an die Display-Skalierung angepasste UI.
 - Bilder im Hintergrund laden; veraltete Ladeergebnisse werden verworfen.
 - PNG, JPEG/JFIF, BMP/DIB, GIF, TIFF, ICO über Windows WIC.
-- SVG-Formen, PSD-Komposit, TGA, PGM/PPM, PIC und QOI über eingebettete Decoder.
-- Optionaler ImageMagick-Decoder für zusätzliche Formate; keine automatischen Downloads.
+- WebP (auch erste Animationsframes), SVG-Formen, PSD-Komposit, TGA, PGM/PPM, PIC und QOI über eingebettete Decoder.
+- Zusätzliche Decoder im vollständigen ZIP, automatisch erkannt: geprüfte AVIF-, HEIC-, JXL-, JP2-, EXR-, DDS- und PCX-Dateien einschließlich Galerie-Vorschau.
+- Weitere RAW-/Raster-/Vektorformate über das Decoder-Paket, abhängig von Variante und Kameramodell.
 
 Originaldateien werden nicht verändert. Drehen und Zoom betreffen nur die Anzeige.
 GIFs, APNGs und mehrseitige Dateien zeigen die erste decodierbare Seite; Animation
-und Ebenenbearbeitung gehören nicht zu v0.2. Die Diashow wechselt zwischen Dateien.
+und Ebenenbearbeitung gehören nicht zu v0.3. Die Diashow wechselt zwischen Dateien.
 
 ## Bedienung
 
@@ -58,24 +67,28 @@ und Ebenenbearbeitung gehören nicht zu v0.2. Die Diashow wechselt zwischen Date
 | Hilfe | F1 |
 | Vollbild | F11 |
 | Diashow | Leertaste |
-| Hilfe, Vollbild oder Diashow verlassen | Esc |
+| Hilfe/Einstellungen/Vollbild/Diashow verlassen oder Galerie öffnen | Esc |
 | Schaltflächen auswählen / auslösen | Tab, Umschalt+Tab / Enter |
 
 Ein Dateipfad kann auch als Startargument übergeben werden:
 
 ```powershell
-.\FotoVLC.exe 'C:\Fotos\Mein Bild.png'
+.\PhotoVLC.exe 'C:\Fotos\Mein Bild.png'
 ```
 
 ## Zusätzliche Decoder
 
-Für weitere Formate kann eine aktuelle **ImageMagick-7-Installation** verwendet
-werden: https://imagemagick.org/script/download.php#windows . Foto VLC findet
-`magick.exe` im PATH oder über die Variable `FOTO_VLC_MAGICK`.
+Das vollständige ZIP enthält bereits ein portables **ImageMagick 7.1.2-33** in
+`codecs/`. Es wird ohne zusätzliche Installation erkannt. Lizenz, Herkunft,
+getestete Formate und das separate Quellcodepaket stehen in [docs/codecs.md](docs/codecs.md).
+Wer nur die einzelne EXE verwendet, kann zusätzlich ImageMagick installieren:
+https://imagemagick.org/script/download.php#windows . Photo VLC findet
+`magick.exe` neben der App in `codecs/`, im PATH oder über `PHOTO_VLC_MAGICK`.
+Die bisherige Variable `FOTO_VLC_MAGICK` bleibt kompatibel.
 
 ```powershell
-$env:FOTO_VLC_MAGICK = 'C:\Program Files\ImageMagick-7.x.x-Q16-HDRI\magick.exe'
-.\FotoVLC.exe
+$env:PHOTO_VLC_MAGICK = 'C:\Program Files\ImageMagick-7.x.x-Q16-HDRI\magick.exe'
+.\PhotoVLC.exe
 ```
 
 Das ist ein Beispielpfad; verwende den tatsächlichen Installationspfad. Unter
@@ -87,9 +100,13 @@ zeigen eine verständliche Fehlermeldung.
 
 ## Lokale Einstellungen
 
-Ansichtsoptionen und zuletzt erfolgreich geöffnete Bilder liegen ausschließlich
-auf diesem Gerät unter `%LOCALAPPDATA%\FotoVLC\settings.ini`. Die Liste lässt
-sich im Menü „Weitere Optionen → Liste »Zuletzt geöffnet« leeren“ löschen.
+Galerieordner, Favoriten, Sprache, Design, Ansichtsoptionen und zuletzt
+erfolgreich geöffnete Bilder liegen ausschließlich
+auf diesem Gerät unter `%LOCALAPPDATA%\PhotoVLC\settings.ini`. Der Verlauf lässt
+sich in den Einstellungen löschen. Die Galerie kopiert keine Fotos und das
+Entfernen eines Galerieordners löscht keine Dateien. Pro hinzugefügtem Ordner
+werden direkt enthaltene Bilder erfasst; Unterordner können separat ergänzt
+werden. Die Galerie indexiert bis zu 10.000 erkannte Dateien.
 Die Unicode-Datei wird atomar ersetzt, damit auch internationale Dateinamen
 korrekt erhalten bleiben. Es werden keine Bilder in die App kopiert.
 
@@ -101,12 +118,12 @@ Mit Visual Studio 2022 Build Tools, Windows SDK und CMake ≥ 3.20:
 cmake -S . -B build -A x64
 cmake --build build --config Release --parallel 2
 ctest --test-dir build -C Release --output-on-failure
-$p = Start-Process build/Release/FotoVLC.exe -ArgumentList '--self-test','windows-self-test.txt' -Wait -PassThru
+$p = Start-Process build/Release/PhotoVLC.exe -ArgumentList '--self-test','windows-self-test.txt' -Wait -PassThru
 Get-Content windows-self-test.txt
 if ($p.ExitCode -ne 0) { throw 'Windows self-test failed' }
 ```
 
-Die EXE liegt anschließend in `build/Release/FotoVLC.exe`. MSVC-Runtime und die
+Die EXE liegt anschließend in `build/Release/PhotoVLC.exe`. MSVC-Runtime und die
 kleinen Decoder werden statisch eingebunden; nur Windows-System-DLLs werden benötigt.
 
 Unter Linux lassen sich die portablen Decoder- und Core-Tests ausführen:
@@ -121,6 +138,7 @@ Ein Windows-Cross-Build mit installiertem MinGW-w64 ist ebenfalls möglich:
 
 ```sh
 cmake -S . -B build/mingw -DCMAKE_SYSTEM_NAME=Windows \
+  -DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc \
   -DCMAKE_CXX_COMPILER=x86_64-w64-mingw32-g++ -DCMAKE_BUILD_TYPE=Release
 cmake --build build/mingw --parallel 2
 ```
@@ -128,7 +146,10 @@ cmake --build build/mingw --parallel 2
 Der GitHub-Workflow prüft die portablen Tests sowie die echten WIC-Decoder,
 Pixelwerte, Unicode-Pfade, GDI+-Darstellung, Vorschaubilder, native Klick- und
 Tastaturbedienung, Einstellungen und Versionsinformationen auf Windows.
-Bei einem `v*`-Tag veröffentlicht er erst nach bestandenen Tests ein Release.
+Er prüft außerdem Suche, Favoriten, Themes, Sprachwechsel und 100/150/200-%-Skalierung.
+Der Codec-Test lädt echte Bilddateien und prüft Pixelwerte und Vorschaubilder.
+Bei einem `v*`-Tag veröffentlicht er erst nach bestandenen Tests ein Release,
+mit einem separaten Quellcodepaket für den unveränderten Decoder-Prozess.
 
 ## Grenzen
 

@@ -1,6 +1,8 @@
-# Formatstatus in v0.2.0
+# Formatstatus in v0.3.0
 
-Alle **194 unterschiedlichen Endungen** der Anfrage sind erfasst. Die App prüft
+**Neu in 0.3.0:** WebP ist eingebaut. Im vollständigen ZIP wurden außerdem AVIF, HEIC, JXL, JP2, EXR, DDS und PCX mit echten Dateien und Galerie-Vorschaubildern geprüft. Weitere Varianten bleiben decoderabhängig.
+
+Alle **194 unterschiedlichen Endungen** der Anfrage sind erfasst. Das vollständige ZIP enthält zusätzliche Decoder (siehe [codecs.md](codecs.md)). Die App prüft
 zuerst den Dateiinhalt mit Windows WIC, dann die eingebetteten Decoder und
 anschließend – sofern installiert – ImageMagick. Eine Endung ist kein Codec.
 
@@ -10,7 +12,7 @@ anschließend – sofern installiert – ImageMagick. Eine Endung ist kein Codec
 - **Optional / nicht zugesichert**: nur wenn die konkrete ImageMagick-Installation
   einen geeigneten Decoder/Delegate enthält. Kein Format dieser Gruppe wurde hier
   durch das bloße Eintragen in die Liste als funktionsfähig bestätigt.
-- **Nicht nativ unterstützt**: kein eigener Decoder in v0.2; kein Versprechen,
+- **Nicht nativ unterstützt**: kein eigener Decoder in v0.3; kein Versprechen,
   dass ImageMagick das Format lesen kann. Häufig proprietär, ein Projektformat,
   ein Cloud-Dokument, ein uneindeutiges Dateiformat oder ein Container.
 
@@ -212,7 +214,7 @@ enthalten. `.emf+` bezeichnet oft Inhalt innerhalb einer EMF-Datei.
 | `.wal` | Nicht nativ unterstützt; externer Decoder nicht zugesichert |
 | `.wbmp` | Optional / nicht zugesichert: installierter WIC-Codec oder ImageMagick |
 | `.wdp` | Optional / nicht zugesichert: installierter WIC-Codec oder ImageMagick |
-| `.webp` | Optional / nicht zugesichert: installierter WIC-Codec oder ImageMagick |
+| `.webp` | Eingebaut: libwebp; erstes Bild bei Animationen |
 | `.wmf` | Optional / nicht zugesichert: installierter WIC-Codec oder ImageMagick |
 | `.wpg` | Optional / nicht zugesichert: installierter WIC-Codec oder ImageMagick |
 | `.x3f` | Optional / nicht zugesichert: installierter WIC-Codec oder ImageMagick |

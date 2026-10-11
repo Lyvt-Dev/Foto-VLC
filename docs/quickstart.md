@@ -1,44 +1,53 @@
-# Foto VLC 0.2.0
+# Photo VLC 0.3.0
 
-Ein portabler Foto-Betrachter für Windows 10/11 (64-Bit).
+A portable photo gallery and image viewer for Windows 10/11 (64-bit).
 
-## Loslegen
+## Get started / Loslegen
 
-1. ZIP in einen Ordner entpacken.
-2. `FotoVLC.exe` starten.
-3. „Bild öffnen“ oder „Ordner öffnen“ auswählen. Du kannst Dateien auch direkt ins Fenster ziehen.
+1. Extract the entire ZIP into a folder / ZIP vollständig in einen Ordner entpacken.
+2. Start **PhotoVLC.exe**.
+3. Choose **Folder / Ordner** to add your photo folders to the gallery.
+4. Click a thumbnail to open a photo, or drag a file into the window.
 
-Der Filmstreifen zeigt die Bilder im aktuellen Ordner. Klicke auf eine Vorschau
-oder benutze die Pfeiltasten, um zum nächsten Bild zu wechseln. „Details“ zeigt
-Größe, Auflösung und weitere Dateiinformationen.
+Keep the **codecs** directory next to the EXE. It provides additional formats
+without installing another application. The gallery reads the files directly;
+adding a folder does not copy or modify its contents. Import scans that folder,
+not its subfolders; add other folders separately. The gallery indexes up to
+10,000 recognized files.
 
-## Die wichtigsten Handgriffe
+## Language and appearance / Sprache und Design
 
-- **Strg+O**: Bild öffnen; **Strg+Umschalt+O**: Ordner öffnen.
-- **Mausrad**: zur Mausposition zoomen; **Ziehen**: vergrößertes Bild verschieben.
-- **F**: Bild anpassen; **1**: Originalgröße; **Doppelklick**: zwischen beiden Ansichten wechseln.
-- **R**: drehen; **F11**: Vollbild; **Leertaste**: Diashow.
-- **I**: Details; **T**: Filmstreifen; **F1**: Hilfe.
-- **Esc**: Hilfe, Vollbild oder Diashow verlassen.
+Open **Settings / Einstellungen** using the gear at the top right.
+Choose **Deutsch**, **English** or the system language. Changes are immediate.
+The system language defaults to German on German Windows and English otherwise.
+Choose system, dark or light appearance and your preferred opening zoom.
 
-Die Schaltflächen lassen sich auch mit Tab auswählen und mit Enter auslösen.
-Beim Drehen und Zoomen werden deine Originaldateien nicht verändert.
+## Gallery and favorites
 
-## Verlauf und Einstellungen
+Search by file name or extension. Use Select to select several photos, then
+Toggle favorites. You can also use the heart while viewing a photo.
+The sidebar shows your favorites; Sort reverses filename order and the grid
+button changes thumbnail size. Scroll to browse more images.
 
-Die Startseite merkt sich bis zu vier zuletzt geöffnete Bilder. Unter
-„Weitere Optionen → Liste »Zuletzt geöffnet« leeren“ kannst du diese Liste löschen.
-Ansichtsoptionen und Verlauf werden lokal in `%LOCALAPPDATA%\FotoVLC\settings.ini`
-gespeichert. Es ist kein Konto erforderlich.
+## Viewing shortcuts
 
-## Formate und Updates
+- Ctrl+O: open image; Ctrl+Shift+O: open folder.
+- Left/Right: previous/next image; mouse wheel: zoom; drag: pan.
+- F: fit; 1: actual size; double-click: switch between the two.
+- R: rotate; F11: fullscreen; Space: slideshow.
+- I: details; T: filmstrip; F1: keyboard help.
+- Esc: close help/settings/fullscreen/slideshow or return to the gallery.
+- Tab / Shift+Tab: move focus; Enter: activate the focused button.
 
-Die konkrete Formatunterstützung steht in **FORMATS.md**. Zusätzliche Windows-Codecs
-und optional ImageMagick können weitere Formate öffnen. Die Liste der Dateiendungen
-bedeutet keine vollständige Unterstützung aller proprietären Projektformate.
+Viewing, zooming, rotating and favoriting do not change your original files.
 
-Die installierte Version steht oben in der App und unter „Über die App“.
-Neue Versionen: https://github.com/Lyvt-Dev/Foto-VLC/releases
-Quellcode und vollständige Anleitung: https://github.com/Lyvt-Dev/Foto-VLC
+## Local preferences
 
-MIT-Lizenz: siehe LICENSE. Weitere Lizenztexte sind in diesem ZIP enthalten.
+Folders, favorites, viewing preferences and recent images are stored in
+`%LOCALAPPDATA%\PhotoVLC\settings.ini`. Existing Foto VLC settings are migrated.
+No account or telemetry is required. Removing a gallery folder does not delete
+its files. Clear the recent-image list in Settings.
+
+See **FORMATS.md** and **CODECS.md** for actual supported formats and limits.
+New versions: https://github.com/Lyvt-Dev/Foto-VLC/releases
+MIT license: LICENSE. Third-party terms: THIRD_PARTY_NOTICES.md and codecs/NOTICE.txt.

@@ -1,25 +1,20 @@
-Foto VLC 0.2.0 überarbeitet die Oberfläche und macht die tägliche Bildbetrachtung einfacher.
+Photo VLC 0.3.0 introduces a photo gallery and a Windows-inspired interface based on the supplied references.
 
-- Ruhige Fotoansicht mit kompakter Werkzeugleiste, eigenen Symbolen und klarer Navigation.
-- Filmstreifen mit echten Vorschaubildern; Klick auf eine Vorschau öffnet das Bild.
-- Startseite mit zuletzt geöffneten Bildern und direktem Datei-/Ordnerzugriff.
-- Native Windows-Schaltflächen mit Tooltips, Tastaturfokus und zugänglichen Namen.
-- Zoom auf die Mausposition, Zoomauswahl und Doppelklick für Originalgröße/Anpassen.
-- Optionale Bilddetails, „Im Explorer zeigen“ und „Dateipfad kopieren“.
-- Natürliche Dateisortierung; „Bild 2“ steht vor „Bild 10“.
-- Gespeicherte Fenstergröße, Ansichtsoptionen und Unicode-sicherer lokaler Verlauf.
-- Version 0.2.0 sichtbar in der App, unter „Über die App“ und in den EXE-Eigenschaften.
-- Eigene Hilfeansicht mit Tastenkürzeln, Formatinformationen und Link zu neuen Versionen.
+- Renamed the application and Windows executable to **Photo VLC / PhotoVLC.exe**.
+- Gallery with real image previews, file-name/type search, folder import, natural sorting and three tile sizes.
+- Collapsible navigation, saved favorites and multiple-photo selection.
+- Settings with system/dark/light themes, German/English/system language and opening zoom preferences.
+- Complete German and English UI, including dialogs, tooltips, keyboard help and decoder errors. Language changes take effect immediately.
+- Fixed button background painting with buffered rendering; consistent hover, pressed, selected and keyboard-focus states.
+- Added a built-in WebP decoder, including first-frame preview for animated WebP.
+- The portable ZIP includes additional codecs: verified AVIF, HEIC, JPEG XL, JPEG 2000, EXR, DDS and PCX decoding and previews, without manual installation.
+- Preserves gallery folders, favorites and preferences locally, and migrates settings from Foto VLC.
+- Visible version in the app, About screen and EXE properties.
 
-Die Windows-App bleibt portabel und benötigt keine zusätzliche C++-Runtime.
-Das Release wird erst nach bestandenen Decoder- und Windows-Laufzeittests veröffentlicht.
+**Download PhotoVLC-Windows-x64.zip** for the complete portable application with additional codecs and license documentation. Extract it and start PhotoVLC.exe. The standalone PhotoVLC.exe is the smaller download and needs additional Windows codecs or ImageMagick for some formats.
 
-Lade `FotoVLC-Windows-x64.zip` für die App mit Lizenz- und Formatinformationen
-oder `FotoVLC.exe` für die einzelne Datei herunter. `SHA256SUMS.txt` enthält die
-EXE-Prüfsumme; `windows-self-test.txt` dokumentiert die Windows-Tests.
+Windows UI tests cover gallery search, selection, favorites, English/German switching, settings persistence, themes and 100/150/200% display scaling. Additional codec tests check real decoded pixels and gallery previews. Test reports and checksums are included with this release.
 
-**Formatgrenzen:** Die 194 Endungen im Dateifilter sind keine Garantie für 194
-funktionierende Decoder. Proprietäre Design-/CAD-Projekte und Spielecontainer
-sind weiterhin nicht durchgehend unterstützt. GIF/APNG und mehrseitige Dateien
-zeigen das erste Bild; Animation und Ebenenbearbeitung sind nicht enthalten.
-Die EXE ist nicht code-signiert.
+**Format boundaries:** 194 recognized file extensions do not mean 194 fully supported formats. Proprietary design/CAD projects and game containers remain dependent on available readers. RAW support depends on camera/model. PDF/EPS/PS need Ghostscript. Animations and multipage files currently show the first image. The EXE is not code-signed.
+
+PhotoVLC-Codec-Sources.zip provides the corresponding source/build trees for the included third-party codec runtime; it is not needed to run Photo VLC.

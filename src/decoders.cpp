@@ -1,5 +1,7 @@
 #include "decoders.hpp"
 #include <array>
+#include "webp/decode.h"
+#include "webp/demux.h"
 #include <algorithm>
 #include <cmath>
 #include <cstring>
@@ -62,6 +64,17 @@ Raster qoi(const std::vector<std::uint8_t>& data) {
 }
 Raster embedded(const std::vector<std::uint8_t>& data,const std::string& ext) {
     if(data.empty() || data.size()>128u*1024*1024)return fail("Empty file or embedded decoder input limit exceeded");
+    if(ext=="webp" || (data.size()>=12&&!std::memcmp(data.data(),"RIFF",4)&&!std::memcmp(data.data()+8,"WEBP",4))) {
+        WebPData input{data.data(),data.size()};WebPDemuxer* demux=WebPDemux(&input);
+        if(!demux)return fail("Invalid WebP container");
+        unsigned w=WebPDemuxGetI(demux,WEBP_FF_CANVAS_WIDTH),h=WebPDemuxGetI(demux,WEBP_FF_CANVAS_HEIGHT);
+        if(!w||!h||w>16384||h>16384||std::uint64_t(w)*h>32000000){WebPDemuxDelete(demux);return fail("WebP dimensions exceed supported limits");}
+        WebPAnimDecoderOptions options;WebPAnimDecoderOptionsInit(&options);options.color_mode=MODE_RGBA;
+        WebPAnimDecoder* decoder=WebPAnimDecoderNew(&input,&options);Raster result;result.width=w;result.height=h;result.engine="libwebp 1.6.0";result.frames=WebPDemuxGetI(demux,WEBP_FF_FRAME_COUNT);
+        uint8_t* pixels=nullptr;int timestamp=0;
+        if(decoder&&WebPAnimDecoderGetNext(decoder,&pixels,&timestamp))result.rgba.assign(pixels,pixels+size_t(w)*h*4);else result=fail("Invalid WebP pixel data");
+        WebPAnimDecoderDelete(decoder);WebPDemuxDelete(demux);return result;
+    }
     if(ext=="qoi" || (data.size()>=4 && !std::memcmp(data.data(),"qoif",4)))return qoi(data);
     if(ext=="svg") {
         if(data.size()>8u*1024*1024)return fail("SVG exceeds 8 MiB limit");

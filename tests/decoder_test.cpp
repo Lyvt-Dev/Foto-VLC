@@ -1,5 +1,7 @@
 #include "decoders.hpp"
 #include <iostream>
+#include <fstream>
+#include <filesystem>
 #include <stdexcept>
 #include <string>
 #define CHECK(x) do { if(!(x)) throw std::runtime_error(#x); ++checks; } while(false)
@@ -28,5 +30,13 @@ int main(){
  CHECK(!foto::embedded(bytes("invalid"),"psd"));
  CHECK(!foto::embedded({},"tga"));
  CHECK(!foto::embedded(bytes("P6\n100000 100000\n255\n"),"ppm"));
+ for(const auto* name:{"alpha.webp","lossy.webp","animated.webp"}){
+   auto path=std::filesystem::path(__FILE__).parent_path()/"fixtures"/name;std::ifstream input(path,std::ios::binary);
+   std::vector<std::uint8_t> data((std::istreambuf_iterator<char>(input)),{});CHECK(!data.empty());
+   auto image=foto::embedded(data,"webp");CHECK(image);CHECK(image.width==3&&image.height==2);
+   CHECK(image.rgba[0]>240&&image.rgba[1]<10&&image.rgba[2]<10);
+   if(std::string(name)!="lossy.webp")CHECK(image.rgba[3]==128);
+   data.resize(10);CHECK(!foto::embedded(data,"webp"));
+ }
  std::cout<<checks<<" decoder checks passed\n";
 }

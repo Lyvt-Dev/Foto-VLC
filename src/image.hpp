@@ -28,5 +28,5 @@ struct TempDirectory {
 };
 Decode wicLoad(const fs::path& path,unsigned maxEdge=0);
 Decode embeddedLoad(const fs::path& path);
-Decode load(const fs::path& path);
+Decode load(const fs::path& path,unsigned maxEdge=0);
 std::wstring magickPath();

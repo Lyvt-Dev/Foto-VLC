@@ -3,6 +3,8 @@
 2 ICON "app.ico"
 3 RCDATA "../third_party/stb/LICENSE"
 4 RCDATA "../third_party/nanosvg/LICENSE.txt"
+6 RCDATA "../third_party/libwebp/COPYING"
+7 RCDATA "../third_party/libwebp/PATENTS"
 5 RCDATA "../LICENSE"
 1 RT_MANIFEST FOTO_MANIFEST_FILE
 1 VERSIONINFO
@@ -16,9 +18,9 @@ BEGIN
   BLOCK "040904B0"
   BEGIN
    VALUE "CompanyName", "Lyvt-Dev\0"
-   VALUE "FileDescription", "Foto VLC - Native photo viewer\0"
+   VALUE "FileDescription", "Photo VLC - Native photo viewer\0"
    VALUE "FileVersion", FOTO_VERSION_STRING "\0"
-   VALUE "ProductName", "Foto VLC\0"
+   VALUE "ProductName", "Photo VLC\0"
    VALUE "ProductVersion", FOTO_VERSION_STRING "\0"
   END
  END

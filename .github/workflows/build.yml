@@ -1,4 +1,4 @@
-name: Build and release Foto VLC
+name: Build and release Photo VLC
 on:
   push:
     branches: [main]
@@ -27,7 +27,7 @@ jobs:
         shell: pwsh
         run: |
           $project = Get-Content CMakeLists.txt -Raw
-          $version = [regex]::Match($project, 'project\(FotoVLC VERSION ([0-9.]+)').Groups[1].Value
+          $version = [regex]::Match($project, 'project\(PhotoVLC VERSION ([0-9.]+)').Groups[1].Value
           if ($env:GITHUB_REF_NAME -ne "v$version") { throw 'Release tag does not match the application version' }
       - name: Configure x64
         run: cmake -S . -B build -A x64
@@ -40,13 +40,36 @@ jobs:
             Get-Content build/build.log | Where-Object { $_ -match 'error (C[0-9]+|LNK[0-9]+|RC[0-9]+|MSB[0-9]+|CVT[0-9]+)' } | ForEach-Object { Write-Output "::error::$_" }
           }
           exit $result
+      - name: Prepare portable codec runtime
+        shell: pwsh
+        run: |
+          $url = 'https://github.com/ImageMagick/ImageMagick/releases/download/7.1.2-33/ImageMagick-7.1.2-33-portable-Q8-x64.7z'
+          Invoke-WebRequest $url -OutFile build/codecs.7z
+          $sum = (Get-FileHash build/codecs.7z -Algorithm SHA256).Hash.ToLower()
+          if ($sum -ne 'c091195d6671d1f6e9b4333d41a6946ccc6c154574e0c5441dbea4495edb0c7e') { throw 'Codec archive checksum mismatch' }
+          & 'C:/Program Files/7-Zip/7z.exe' x build/codecs.7z '-obuild/Release/codecs' -y | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw 'Codec archive extraction failed' }
+          Get-ChildItem build/Release/codecs/*.exe | Where-Object Name -ne 'magick.exe' | Remove-Item
+          Invoke-WebRequest 'https://github.com/ImageMagick/ImageMagick/releases/download/7.1.2-33/ImageMagick-7.1.2-33-portable-Q8-x64.cdx.json' -OutFile build/Release/codecs/SBOM.json
+      - name: Test additional formats and gallery previews
+        shell: pwsh
+        run: |
+          $fixtures = Join-Path $pwd 'tests/fixtures'
+          $report = Join-Path $pwd 'build/codec-self-test.txt'
+          $process = Start-Process -FilePath 'build/Release/PhotoVLC.exe' -ArgumentList @('--codec-test', $fixtures, $report) -Wait -PassThru
+          if (Test-Path $report) {
+            Get-Content $report
+            Get-Content $report | Where-Object { $_ -match '^FAIL' } | ForEach-Object { Write-Output "::error::$_" }
+          }
+          if ($process.ExitCode -ne 0) { throw 'Additional codec self-test failed' }
+          if (!(Test-Path $report)) { throw 'Missing codec test report' }
       - name: Test decoders and core
         run: ctest --test-dir build -C Release --output-on-failure
       - name: Test Windows WIC, rendering and desktop controls
         shell: pwsh
         run: |
           $report = Join-Path $pwd 'build/windows-self-test.txt'
-          $process = Start-Process -FilePath 'build/Release/FotoVLC.exe' -ArgumentList @('--self-test', $report) -Wait -PassThru
+          $process = Start-Process -FilePath 'build/Release/PhotoVLC.exe' -ArgumentList @('--self-test', $report) -Wait -PassThru
           if (Test-Path $report) { Get-Content $report }
           if ($process.ExitCode -ne 0) { throw "Windows self-test failed: $($process.ExitCode)" }
           if (!(Test-Path $report)) { throw 'Missing Windows self-test report' }
@@ -54,24 +77,32 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Path dist/package -Force | Out-Null
-          Copy-Item build/Release/FotoVLC.exe dist/FotoVLC.exe
-          Copy-Item build/Release/FotoVLC.exe, LICENSE, THIRD_PARTY_NOTICES.md dist/package/
+          Copy-Item build/Release/PhotoVLC.exe dist/PhotoVLC.exe
+          Copy-Item build/Release/PhotoVLC.exe, LICENSE, THIRD_PARTY_NOTICES.md dist/package/
           Copy-Item docs/quickstart.md dist/package/README.md
           Copy-Item docs/formats.md dist/package/FORMATS.md
+          Copy-Item third_party/libwebp/COPYING dist/package/WEBP-LICENSE.txt
+          Copy-Item third_party/libwebp/PATENTS dist/package/WEBP-PATENTS.txt
           Copy-Item third_party/stb/LICENSE dist/package/STB-LICENSE.txt
           Copy-Item third_party/nanosvg/LICENSE.txt dist/package/NANOSVG-LICENSE.txt
           Copy-Item build/windows-self-test.txt dist/windows-self-test.txt
-          Compress-Archive -Path dist/package/* -DestinationPath dist/FotoVLC-Windows-x64.zip
-          $sum = (Get-FileHash dist/FotoVLC.exe -Algorithm SHA256).Hash.ToLower()
-          "$sum  FotoVLC.exe" | Set-Content -Encoding ascii dist/SHA256SUMS.txt
+          Copy-Item build/codec-self-test.txt dist/codec-self-test.txt
+          Copy-Item build/Release/codecs dist/package/codecs -Recurse
+          Copy-Item docs/codecs.md dist/package/CODECS.md
+          Compress-Archive -Path dist/package/* -DestinationPath dist/PhotoVLC-Windows-x64.zip
+          $sum = (Get-FileHash dist/PhotoVLC.exe -Algorithm SHA256).Hash.ToLower()
+          "$sum  PhotoVLC.exe" | Set-Content -Encoding ascii dist/SHA256SUMS.txt
+          $zipSum = (Get-FileHash dist/PhotoVLC-Windows-x64.zip -Algorithm SHA256).Hash.ToLower()
+          "$zipSum  PhotoVLC-Windows-x64.zip" | Add-Content -Encoding ascii dist/SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: FotoVLC-Windows-x64
+          name: PhotoVLC-Windows-x64
           path: |
-            dist/FotoVLC.exe
-            dist/FotoVLC-Windows-x64.zip
+            dist/PhotoVLC.exe
+            dist/PhotoVLC-Windows-x64.zip
             dist/SHA256SUMS.txt
             dist/windows-self-test.txt
+            dist/codec-self-test.txt
   release:
     if: startsWith(github.ref, 'refs/tags/v')
     needs: [portable-tests, windows]
@@ -82,12 +113,14 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
-          name: FotoVLC-Windows-x64
+          name: PhotoVLC-Windows-x64
           path: dist
+      - name: Package corresponding codec sources
+        run: python3 scripts/package-codec-sources.py
       - name: Publish tested executable
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "$GITHUB_REF_NAME" \
-            dist/FotoVLC.exe dist/FotoVLC-Windows-x64.zip dist/SHA256SUMS.txt dist/windows-self-test.txt \
-            --verify-tag --title "Foto VLC $GITHUB_REF_NAME" --notes-file docs/release-notes.md
+            dist/PhotoVLC.exe dist/PhotoVLC-Windows-x64.zip dist/PhotoVLC-Codec-Sources.zip dist/SHA256SUMS.txt dist/windows-self-test.txt dist/codec-self-test.txt \
+            --verify-tag --title "Photo VLC $GITHUB_REF_NAME" --notes-file docs/release-notes.md
