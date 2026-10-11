@@ -4,7 +4,7 @@ Ein kleiner, nativer Foto-Betrachter für **Windows 10/11 x64**, geschrieben in
 C++17. Galerie mit Suche und Favoriten, deutsche und englische Oberfläche,
 System-/Hell-/Dunkel-Design, keine Browser-Runtime und kein Account.
 
-> **PAF-Photos 0.7.2** ist eine Galerie und ein Foto-Betrachter. Die Unterstützung für jedes
+> **PAF-Photos 0.7.3** ist eine Galerie und ein Foto-Betrachter. Die Unterstützung für jedes
 > Design-, CAD- oder Spieleformat ist noch nicht vollständig. Alle 197 erfassten Endungen sind im
 > Dateifilter erfasst; die tatsächliche Unterstützung steht in
 > [docs/formats.md](docs/formats.md).
@@ -66,7 +66,7 @@ signiert. Die Prüfsumme steht im jeweiligen Release.
 
 Bearbeitung und Export lassen Originaldateien unverändert. Nur die ausdrücklich ausgewählten Aktionen im Galerie-Löschmenü löschen Dateien vom PC.
 GIFs, APNGs und mehrseitige Dateien zeigen die erste decodierbare Seite; Animation
-und Ebenenbearbeitung gehören nicht zu v0.7.2. Die Diashow wechselt zwischen Dateien.
+und Ebenenbearbeitung gehören nicht zu v0.7.3. Die Diashow wechselt zwischen Dateien.
 
 ## Bedienung
 

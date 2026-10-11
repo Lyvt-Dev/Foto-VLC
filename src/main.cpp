@@ -700,7 +700,7 @@ void drawButton(const DRAWITEMSTRUCT& item) {
     if(c.id>=ThumbBase)parent=ui::surface;
     bool editorControl=c.id>=Crop&&c.id<=SaveEdits;
     if(c.id==Reveal||c.id==CopyPath||editorControl)parent=ui::surface;
-    if(c.id==InstallCodecs)parent=ui::raised;
+    if(c.id==InstallCodecs||c.id==CodecCatalog)parent=ui::raised;
     if(c.id>=Fit&&c.id<=Slide&&c.id!=Info&&c.id!=Formats)parent=ui::surface;
     if(c.id==ZoomMenu||c.id==OpenSaved||c.id==CloseExport||c.id==RevealSaved)parent=ui::surface;
     ui::fill(g,parent,{0,0,w,h});
@@ -711,7 +711,7 @@ void drawButton(const DRAWITEMSTRUCT& item) {
     Color fg=c.enabled?ui::text:ui::faint;
     Color fill=pressed?ui::line:blend(parent,ui::raised,c.hoverProgress);
     if(c.id==Open||c.id==SelectMode||c.id==ImportFolder)fill=blend(ui::raised,ui::line,c.hoverProgress);
-    if(editorControl||c.id==InstallCodecs)fill=blend(ui::raised,ui::text,0.035f+c.hoverProgress*0.035f);
+    if(editorControl||c.id==InstallCodecs||c.id==CodecCatalog)fill=blend(ui::raised,ui::text,0.035f+c.hoverProgress*0.035f);
     if(setting)fill=blend(ui::raised,ui::text,0.055f+c.hoverProgress*0.035f);
     if(c.active){fill=pressed?ui::line:blend(ui::raised,ui::line,c.hoverProgress);fg=ui::text;}
     if(c.id==Exit&&hot){fill=Color(255,196,43,28);fg=Color(255,255,255,255);}
@@ -746,7 +746,7 @@ void drawButton(const DRAWITEMSTRUCT& item) {
         ui::round(g,on?ui::accent:ui::line,{50,(h-24)/2,52,24},12);
         ui::round(g,on?Color(255,20,20,20):ui::muted,{on?80.0f:54.0f,(h-16)/2,16,16},8);
     }else {
-        bool elevated=setting||editorControl||c.id==InstallCodecs||c.primary||c.active||c.id==Open||c.id==SelectMode||c.id==ImportFolder||c.id==WelcomeOpen||c.id==WelcomeFolder;
+        bool elevated=setting||editorControl||c.id==InstallCodecs||c.id==CodecCatalog||c.primary||c.active||c.id==Open||c.id==SelectMode||c.id==ImportFolder||c.id==WelcomeOpen||c.id==WelcomeFolder;
         foto::Box face=elevated?foto::Box{2,pressed?2.0f:1.0f,w-4,h-4}:foto::Box{0,0,w,h};
         if(elevated){ui::round(g,Color(pressed?25:55,0,0,0),{1,3,w-2,h-3});if(!setting&&!c.primary)fill=blend(fill,ui::text,0.035f);}
         ui::round(g,fill,face);
