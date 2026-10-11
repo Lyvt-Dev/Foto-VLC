@@ -125,6 +125,7 @@ jobs:
           foreach ($file in @('PAFPhotos.exe', 'PAFPhotos.Update.exe', 'codecs/magick.exe', 'LICENSE', 'THIRD_PARTY_NOTICES.md', 'unins000.exe')) {
             if (!(Test-Path (Join-Path $destination $file))) { throw "Missing installed file: $file" }
           }
+          if (!(Test-Path (Join-Path $env:APPDATA 'Microsoft/Windows/Start Menu/Programs/PAF-Photos/PAF-Photos.lnk'))) { throw 'New branded Start menu shortcut missing' }
           if (Test-Path (Join-Path $destination 'PhotoVLC.exe')) { throw 'Upgrade retained old executable' }
           if (Test-Path 'HKCU:/Software/Classes/Applications/PhotoVLC.exe') { throw 'Upgrade retained old Open With candidate' }
           if (!(Test-Path 'HKCU:/Software/Classes/Applications/PAFPhotos.exe/shell/open/command')) { throw 'Open With registration missing' }

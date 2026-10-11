@@ -331,7 +331,7 @@ const wchar_t* updateStatus(){
     case UpdatePhase::Current:return tr(L"Du verwendest die aktuelle Version.");
     case UpdatePhase::Available:return tr(L"Neue Version verfügbar. Installiere sie über die Release-Seite.");
     case UpdatePhase::Downloading:return tr(L"Update wird im Hintergrund heruntergeladen …");
-    case UpdatePhase::Ready:description=tr(L"Version ")+std::wstring(state.version.begin(),state.version.end())+tr(L" wird beim Beenden installiert.");return description.c_str();
+    case UpdatePhase::Ready:description=tr(L"Version ")+std::wstring(state.version.begin(),state.version.end())+(app.preferences.autoUpdates?tr(L" wird beim Beenden installiert."):tr(L" ist bereit zur Installation."));return description.c_str();
     case UpdatePhase::Failed:return tr(L"Updates konnten nicht geprüft werden. Versuche es später erneut.");
     default:return tr(L"Version " FOTO_VERSION_WSTRING L" · Lyvt-Dev · MIT");}
 }
@@ -887,7 +887,7 @@ const wchar_t* settingValue(int id){
     static std::wstring value;
     switch(id){
     case AutoUpdates:return app.preferences.autoUpdates?tr(L"Ein"):tr(L"Aus");
-    case CheckUpdates:{auto state=app.updates.snapshot();return state.phase==UpdatePhase::Checking?tr(L"Prüfen …"):state.phase==UpdatePhase::Downloading?tr(L"Herunterladen …"):state.phase==UpdatePhase::Ready?tr(L"Jetzt installieren"):tr(L"Nach Updates suchen");}
+    case CheckUpdates:{auto state=app.updates.snapshot();return state.phase==UpdatePhase::Checking?tr(L"Prüfen …"):state.phase==UpdatePhase::Downloading?tr(L"Herunterladen …"):state.phase==UpdatePhase::Ready?tr(L"Jetzt installieren"):state.phase==UpdatePhase::Available&&!app.installed?tr(L"Update herunterladen"):tr(L"Nach Updates suchen");}
     case Accent:return tr(L"Farbe wählen");
     case Radius:value=std::to_wstring(app.preferences.radius)+L" px";return value.c_str();
     case Quality:value=std::to_wstring(app.preferences.quality)+L" %";return value.c_str();

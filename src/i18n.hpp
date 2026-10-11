@@ -22,6 +22,8 @@ inline const wchar_t* tr(const wchar_t* german){
         {L"Prüfen …",L"Checking …"},
         {L"Herunterladen …",L"Downloading …"},
         {L"Jetzt installieren",L"Install now"},
+        {L"Update herunterladen",L"Download update"},
+        {L" ist bereit zur Installation.",L" is ready to install."},
         {L"Update konnte nicht gestartet werden. Versuche es über Einstellungen erneut.",L"Could not start the update. Try again from Settings."},
 
         {L"Gespeicherte Kopie anzeigen",L"Show saved copy"},

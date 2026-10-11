@@ -15,6 +15,7 @@ AppSupportURL=https://github.com/Lyvt-Dev/PAF-Photos/issues
 AppUpdatesURL=https://github.com/Lyvt-Dev/PAF-Photos/releases
 DefaultDirName={localappdata}\Programs\PAF-Photos
 DefaultGroupName=PAF-Photos
+UsePreviousGroup=no
 PrivilegesRequired=lowest
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
