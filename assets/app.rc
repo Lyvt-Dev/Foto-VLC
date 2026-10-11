@@ -1,12 +1,13 @@
 #include <windows.h>
+#include "version.h"
 2 ICON "app.ico"
 3 RCDATA "../third_party/stb/LICENSE"
 4 RCDATA "../third_party/nanosvg/LICENSE.txt"
 5 RCDATA "../LICENSE"
-1 RT_MANIFEST "app.manifest"
+1 RT_MANIFEST FOTO_MANIFEST_FILE
 1 VERSIONINFO
- FILEVERSION 0,1,0,0
- PRODUCTVERSION 0,1,0,0
+ FILEVERSION FOTO_VERSION_RESOURCE
+ PRODUCTVERSION FOTO_VERSION_RESOURCE
  FILEOS VOS_NT_WINDOWS32
  FILETYPE VFT_APP
 BEGIN
@@ -16,9 +17,9 @@ BEGIN
   BEGIN
    VALUE "CompanyName", "Lyvt-Dev\0"
    VALUE "FileDescription", "Foto VLC - Native photo viewer\0"
-   VALUE "FileVersion", "0.1.0\0"
+   VALUE "FileVersion", FOTO_VERSION_STRING "\0"
    VALUE "ProductName", "Foto VLC\0"
-   VALUE "ProductVersion", "0.1.0\0"
+   VALUE "ProductVersion", FOTO_VERSION_STRING "\0"
   END
  END
  BLOCK "VarFileInfo"

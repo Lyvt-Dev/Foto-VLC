@@ -1,4 +1,4 @@
-# Formatstatus in v0.1.0
+# Formatstatus in v0.2.0
 
 Alle **194 unterschiedlichen Endungen** der Anfrage sind erfasst. Die App prüft
 zuerst den Dateiinhalt mit Windows WIC, dann die eingebetteten Decoder und
@@ -10,7 +10,7 @@ anschließend – sofern installiert – ImageMagick. Eine Endung ist kein Codec
 - **Optional / nicht zugesichert**: nur wenn die konkrete ImageMagick-Installation
   einen geeigneten Decoder/Delegate enthält. Kein Format dieser Gruppe wurde hier
   durch das bloße Eintragen in die Liste als funktionsfähig bestätigt.
-- **Nicht nativ unterstützt**: kein eigener Decoder in v0.1; kein Versprechen,
+- **Nicht nativ unterstützt**: kein eigener Decoder in v0.2; kein Versprechen,
   dass ImageMagick das Format lesen kann. Häufig proprietär, ein Projektformat,
   ein Cloud-Dokument, ein uneindeutiges Dateiformat oder ein Container.
 

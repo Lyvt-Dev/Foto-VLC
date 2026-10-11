@@ -3,15 +3,15 @@
 Ein kleiner, nativer Foto-Betrachter für **Windows 10/11 x64**, geschrieben in
 C++17. Dunkle Oberfläche, keine Browser-Runtime, kein Account und keine Telemetrie.
 
-> **v0.1 ist ein erster Foto-Betrachter, kein universeller Decoder für jedes
-> Design-, CAD- oder Spieleformat.** Alle 194 angefragten Endungen sind im
+> **Foto VLC 0.2.0** ist ein Foto-Betrachter. Die Unterstützung für jedes
+> Design-, CAD- oder Spieleformat ist noch nicht vollständig. Alle 194 Endungen sind im
 > Dateifilter erfasst; die tatsächliche Unterstützung steht in
 > [docs/formats.md](docs/formats.md).
 
 ![Foto VLC mit geöffnetem Bild](docs/screenshot.png)
 
-Die Abbildung zeigt den tatsächlichen Windows-Build unter Wine mit einer
-eigens erzeugten Testillustration.
+Die Abbildung zeigt den tatsächlichen Windows-Build unter Wine.
+Bildnachweise für die gezeigten Testfotos: [docs/screenshots.md](docs/screenshots.md).
 
 ## Download
 
@@ -24,10 +24,16 @@ signiert. Die Prüfsumme steht im jeweiligen Release.
 ## Funktionen
 
 - Datei oder Ordner öffnen; Dateien und Ordner per Drag-and-drop laden.
-- Im selben Ordner vorwärts/rückwärts blättern.
-- Einpassen, Originalgröße, Mausrad-Zoom und Verschieben durch Ziehen.
+- Filmstreifen mit echten Vorschaubildern und natürlicher Dateisortierung (Bild 2 vor Bild 10).
+- Startseite mit den vier zuletzt geöffneten Bildern.
+- Kompakte Werkzeugleiste, native Windows-Schaltflächen und Hinweise beim Darüberfahren.
+- Anpassen, Originalgröße, Zoom auf die Mausposition und Verschieben durch Ziehen.
+- Doppelklick wechselt zwischen angepasster Ansicht und Originalgröße.
 - In 90°-Schritten drehen, Vollbild, Diashow mit vier Sekunden pro Bild.
-- Dateiname, Format, Größe, Auflösung und verwendeten Decoder anzeigen.
+- Bilddetails bei Bedarf einblenden: Dateiname, Format, Größe, Auflösung und Änderungsdatum.
+- Datei im Explorer anzeigen oder ihren Pfad kopieren.
+- Sichtbare Versionsnummer und eigene Hilfeansicht mit Tastenkürzeln und Formatübersicht.
+- Fenstergröße, Detailansicht und Filmstreifen werden für den nächsten Start gespeichert.
 - Transparenzraster, Unicode-Dateinamen und an die Display-Skalierung angepasste UI.
 - Bilder im Hintergrund laden; veraltete Ladeergebnisse werden verworfen.
 - PNG, JPEG/JFIF, BMP/DIB, GIF, TIFF, ICO über Windows WIC.
@@ -36,7 +42,7 @@ signiert. Die Prüfsumme steht im jeweiligen Release.
 
 Originaldateien werden nicht verändert. Drehen und Zoom betreffen nur die Anzeige.
 GIFs, APNGs und mehrseitige Dateien zeigen die erste decodierbare Seite; Animation
-und Ebenenbearbeitung gehören nicht zu v0.1. Die Diashow wechselt zwischen Dateien.
+und Ebenenbearbeitung gehören nicht zu v0.2. Die Diashow wechselt zwischen Dateien.
 
 ## Bedienung
 
@@ -47,9 +53,12 @@ und Ebenenbearbeitung gehören nicht zu v0.1. Die Diashow wechselt zwischen Date
 | Einpassen / 1:1 | F / 1 |
 | Zoom | Mausrad oder + / − |
 | Drehen / Informationen | R / I |
+| Filmstreifen | T |
+| Zwischen Anpassen und 1:1 wechseln | Doppelklick |
+| Hilfe | F1 |
 | Vollbild | F11 |
 | Diashow | Leertaste |
-| Vollbild oder Diashow verlassen | Esc |
+| Hilfe, Vollbild oder Diashow verlassen | Esc |
 | Schaltflächen auswählen / auslösen | Tab, Umschalt+Tab / Enter |
 
 Ein Dateipfad kann auch als Startargument übergeben werden:
@@ -69,12 +78,20 @@ $env:FOTO_VLC_MAGICK = 'C:\Program Files\ImageMagick-7.x.x-Q16-HDRI\magick.exe'
 .\FotoVLC.exe
 ```
 
-Das ist ein Beispielpfad; verwende den tatsächlichen Installationspfad. Im Dialog
-„Formate & Hilfe“ steht, ob ImageMagick gefunden wurde. Mit
+Das ist ein Beispielpfad; verwende den tatsächlichen Installationspfad. Unter
+„Info & Hilfe → Dateiformate“ steht, ob ImageMagick gefunden wurde. Mit
 `magick identify -list format` kann die installierte Decoderliste geprüft werden.
 PDF/EPS/PS und manche AI-Dateien brauchen ggf. Ghostscript. Die App ändert keine
 ImageMagick-Sicherheitsrichtlinien. Formate, für die kein Decoder vorhanden ist,
 zeigen eine verständliche Fehlermeldung.
+
+## Lokale Einstellungen
+
+Ansichtsoptionen und zuletzt erfolgreich geöffnete Bilder liegen ausschließlich
+auf diesem Gerät unter `%LOCALAPPDATA%\FotoVLC\settings.ini`. Die Liste lässt
+sich im Menü „Weitere Optionen → Liste »Zuletzt geöffnet« leeren“ löschen.
+Die Unicode-Datei wird atomar ersetzt, damit auch internationale Dateinamen
+korrekt erhalten bleiben. Es werden keine Bilder in die App kopiert.
 
 ## Selbst bauen
 
@@ -109,7 +126,8 @@ cmake --build build/mingw --parallel 2
 ```
 
 Der GitHub-Workflow prüft die portablen Tests sowie die echten WIC-Decoder,
-Pixelwerte, Unicode-Pfade, GDI+-Darstellung und Desktop-Steuerelemente auf Windows.
+Pixelwerte, Unicode-Pfade, GDI+-Darstellung, Vorschaubilder, native Klick- und
+Tastaturbedienung, Einstellungen und Versionsinformationen auf Windows.
 Bei einem `v*`-Tag veröffentlicht er erst nach bestandenen Tests ein Release.
 
 ## Grenzen
@@ -124,7 +142,7 @@ Ressourcenbegrenzung, keine vollständige Sandbox.
 Die App verarbeitet maximal 512 MiB große Eingabedateien; die eingebetteten
 Decoder haben ein 128-MiB-Dateilimit, SVG ein 8-MiB-Limit. Keine garantierte
 farbverbindliche Darstellung, keine HDR-Ausgabe, kein Export, kein Editor.
-Die Windows-Oberfläche ist speziell für diese App gezeichnet; eine vollständige
-Screenreader-Integration ist noch nicht vorhanden.
+Die Oberfläche verwendet native Windows-Schaltflächen mit zugänglichen Namen
+und Tastaturfokus. Eine vollständige Screenreader-Prüfung steht noch aus.
 
 [MIT-Lizenz](LICENSE) · [Drittanbieter-Lizenzen](THIRD_PARTY_NOTICES.md)

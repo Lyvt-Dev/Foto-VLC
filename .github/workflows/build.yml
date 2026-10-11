@@ -22,6 +22,13 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Verify release version
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        run: |
+          $project = Get-Content CMakeLists.txt -Raw
+          $version = [regex]::Match($project, 'project\(FotoVLC VERSION ([0-9.]+)').Groups[1].Value
+          if ($env:GITHUB_REF_NAME -ne "v$version") { throw 'Release tag does not match the application version' }
       - name: Configure x64
         run: cmake -S . -B build -A x64
       - name: Build release
@@ -48,7 +55,8 @@ jobs:
         run: |
           New-Item -ItemType Directory -Path dist/package -Force | Out-Null
           Copy-Item build/Release/FotoVLC.exe dist/FotoVLC.exe
-          Copy-Item build/Release/FotoVLC.exe, README.md, LICENSE, THIRD_PARTY_NOTICES.md dist/package/
+          Copy-Item build/Release/FotoVLC.exe, LICENSE, THIRD_PARTY_NOTICES.md dist/package/
+          Copy-Item docs/quickstart.md dist/package/README.md
           Copy-Item docs/formats.md dist/package/FORMATS.md
           Copy-Item third_party/stb/LICENSE dist/package/STB-LICENSE.txt
           Copy-Item third_party/nanosvg/LICENSE.txt dist/package/NANOSVG-LICENSE.txt
