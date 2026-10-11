@@ -36,3 +36,11 @@ SHA-256: `c091195d6671d1f6e9b4333d41a6946ccc6c154574e0c5441dbea4495edb0c7e`
 
 You can override discovery with `PHOTO_VLC_MAGICK` set to the absolute path to
 `magick.exe`. The former `FOTO_VLC_MAGICK` variable is accepted for compatibility.
+
+In 0.7.3, **All decoders and formats** opens a searchable live catalog of built-in
+readers, every WIC decoder registered on the PC, and the entire output of the
+installed runtime's `magick -list format`. Read/write flags and delegate notes
+are preserved. The decoder page also links to official Ghostscript downloads,
+Windows Store image extensions, and ImageMagick's format reference. There is
+no universal list of every third-party codec; the catalog reports this installation
+and official options rather than claiming unsupported proprietary files.

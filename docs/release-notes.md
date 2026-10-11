@@ -1,3 +1,13 @@
+# 0.7.3
+
+- Keep editor buttons and slider controls stable during adjustments: unchanged captions, bounds, enabled states and visibility are no longer reset on every preview.
+- Generate cached previews at up to 1024 pixels while dragging; calculate the final edit at the original decoded resolution after release. Undo records one full-resolution result per gesture.
+- Match editor buttons to the app's raised surfaces, subtle outlines, corner-radius setting and accent-color contrast.
+- Align the About/help back button with its content, clear of the navigation rail.
+- Add a searchable catalog of built-in readers, all registered Windows WIC decoders, and the complete format list from the installed ImageMagick runtime. The catalog is populated on a worker thread.
+- Add official Ghostscript, Windows image-extension and ImageMagick format-documentation links. These are external downloads; a reader name does not guarantee every file variant or missing delegate.
+- Verify bounded live previews, full-resolution commit, stable enabled controls, and the actual installed decoder catalog in native Windows tests.
+
 # 0.7.2-fix
 
 - Editor buttons paint their full pixel bounds with no native square outlines or stale corner pixels.

@@ -5,6 +5,7 @@
 #include "edit.hpp"
 #include "resize_dialog.hpp"
 #include "photo_editor.hpp"
+#include "decoder_catalog.hpp"
 #include "codec_pack.hpp"
 #include <commdlg.h>
 #include "core.hpp"
@@ -43,7 +44,7 @@ enum Action {
     NavToggle=30,Gallery,Favorites,Settings,ImportFolder,Favorite,Language,Theme,DefaultZoom,TileInfo,Sort,GridSize,SelectMode,ClearSelection,RemoveFolder,Minimize,Maximize,Exit,
     Export=48,Mirror,CopyRaster,ResetView,Accent,Radius,Animations,Recursive,Quality,
     AutoUpdates=57,CheckUpdates,RevealSaved,
-    Search=60,CloseExport,OpenSaved,DecoderPage,InstallCodecs,
+    Search=60,CloseExport,OpenSaved,DecoderPage,InstallCodecs,CodecCatalog,GhostscriptDownload,WindowsCodecs,CodecDocs,
     Edit=70,Crop,Resize,BrightDown,BrightUp,ContrastDown,ContrastUp,SaturationDown,SaturationUp,Grayscale,Sepia,Undo,Redo,ResetEdits,SaveEdits,RestoreHidden,GalleryBase=1000,RecentBase=100,ThumbBase=200
 };
 enum class Icon {None,Image,Folder,Left,Right,Fit,Actual,Minus,Plus,Rotate,Full,Info,Strip,Play,Pause,More,Home,Close,Help,External,Copy,Menu,Heart,Settings,Search,Sort,Grid,Check,Computer,Window,Mirror,Convert,Pen,Decoder};
@@ -619,9 +620,11 @@ void layoutControls() {
     if(app.decoderPage){
         float x=contentLeft(),w=std::min(850.0f,l.width-x-42);auto phase=app.codecs.snapshot().phase;bool running=phase==CodecPhase::Downloading||phase==CodecPhase::Installing;
         place(InstallCodecs,{x+24,466,std::min(230.0f,w-48),42},running?tr(L"Wird installiert …"):magickPath().empty()?tr(L"Decoder installieren"):tr(L"Erneut installieren"),Icon::Decoder,!running,false,true);
+    place(CodecCatalog,{x+270,466,std::min(280.0f,w-294),42},tr(L"Alle Decoder und Formate"),Icon::Grid);
+        float column=(w-16)/3;place(GhostscriptDownload,{x,554,column,42},L"Ghostscript",Icon::External);place(WindowsCodecs,{x+column+8,554,column,42},tr(L"Windows-Erweiterungen"),Icon::External);place(CodecDocs,{x+2*(column+8),554,column,42},tr(L"Decoder-Dokumentation"),Icon::External);
     }else if(app.helpPage>=0) {
-        place(CloseHelp,{24,78,112,34},tr(L"Zurück"),Icon::Left);
         float x=std::max(contentLeft(),(w-800)/2),y=198;
+        place(CloseHelp,{x,84,112,34},tr(L"Zurück"),Icon::Left);
         place(About,{x,y,128,38},tr(L"Über die App"),Icon::None,true,app.helpPage==0);
         place(HelpKeys,{x+138,y,132,38},tr(L"Tastenkürzel"),Icon::None,true,app.helpPage==1);
         place(HelpFormats,{x+280,y,132,38},tr(L"Dateiformate"),Icon::None,true,app.helpPage==2);
@@ -713,7 +716,8 @@ void drawButton(const DRAWITEMSTRUCT& item) {
     if(c.active){fill=pressed?ui::line:blend(ui::raised,ui::line,c.hoverProgress);fg=ui::text;}
     if(c.id==Exit&&hot){fill=Color(255,196,43,28);fg=Color(255,255,255,255);}
     if(c.primary){fill=blend(ui::accent,ui::line,pressed?0.35f:c.hoverProgress*0.15f);fg=(int(fill.GetR())*299+int(fill.GetG())*587+int(fill.GetB())*114)>140000?Color(255,0,0,0):Color(255,255,255,255);}
-    if(c.id>=GalleryBase) {
+    if(c.id==Minimize||c.id==Maximize||c.id==Exit){ui::round(g,fill,{2,2,w-4,h-4},4);ui::icon(g,c.icon,(w-19)/2,(h-19)/2,fg,19);}
+    else if(c.id>=GalleryBase) {
         ui::round(g,fill,{0,0,w,h});
         if(c.item<app.filtered.size()){auto thumb=app.thumbs.find(app.filtered[c.item]);
             if(thumb!=app.thumbs.end()&&thumb->second)ui::drawPicture(g,*thumb->second,{4,4,w-8,h-(app.preferences.tileInfo?44:8)});
@@ -925,9 +929,9 @@ float contentLeft(){return sidebarWidth()+48;}
 bool shellNavigation(){return app.gallery||app.settings||app.decoderPage||app.helpPage>=0;}
 void layoutShell(){
     auto l=viewLayout();float w=l.width;bool navigation=shellNavigation();
-    place(Minimize,{w-138,0,46,64},tr(L"Minimieren"),Icon::Minus);
-    place(Maximize,{w-92,0,46,64},IsZoomed(app.window)?tr(L"Wiederherstellen"):tr(L"Maximieren"),Icon::Window);
-    place(Exit,{w-46,0,46,64},tr(L"Schließen"),Icon::Close);
+    place(Minimize,{w-142,8,42,48},tr(L"Minimieren"),Icon::Minus);
+    place(Maximize,{w-96,8,42,48},IsZoomed(app.window)?tr(L"Wiederherstellen"):tr(L"Maximieren"),Icon::Window);
+    place(Exit,{w-50,8,42,48},tr(L"Schließen"),Icon::Close);
     place(Open,{w-340,12,122,40},tr(L"Öffnen"),Icon::Image,true,false,false,tr(L"Bild öffnen (Strg+O)"));
     place(Settings,{w-202,12,40,40},tr(L"Einstellungen"),Icon::Settings,true,app.settings);
     if(navigation){
@@ -1115,10 +1119,10 @@ void drawDecoders(Graphics& g,const foto::ViewerLayout& l){float x=contentLeft()
  ui::label(g,L"PNG · JPEG · BMP · GIF · TIFF · ICO · WebP · SVG · PSD · TGA · QOI\nPCX · DDS (DXT1/3/5, RGB) · PBM/PGM/PPM/PAM · SGI · XBM · HDR",{x+24,220,w-48,58},13,ui::muted,false,false,true);
  auto phase=app.codecs.snapshot().phase;ui::round(g,ui::raised,{x,308,w,230});ui::label(g,tr(L"Empfohlen: Erweiterte Bildformate"),{x+24,318,w-48,28},18,ui::text,true);
  ui::label(g,tr(L"Ein Decoder-Paket für diese Formatgruppen:"),{x+24,356,w-48,24},13,ui::muted);
- ui::label(g,L"AVIF · HEIC / HEIF · JPEG XL\nJPEG 2000 · OpenEXR · ImageMagick",{x+24,388,w-48,54},15,ui::text,false,false,true);
+ ui::label(g,L"AVIF · HEIC / HEIF · JPEG XL\nJPEG 2000 · OpenEXR · RAW / LibRaw · ImageMagick",{x+24,388,w-48,54},15,ui::text,false,false,true);
  const wchar_t* status=phase==CodecPhase::Failed?tr(L"Installation fehlgeschlagen. Bitte erneut versuchen."):phase==CodecPhase::Downloading?tr(L"Decoder-Paket wird heruntergeladen …"):phase==CodecPhase::Installing?tr(L"Decoder werden installiert …"):magickPath().empty()?tr(L"Noch nicht installiert · Kostenloser Download"):tr(L"Installiert · Bei Problemen erneut installieren");
  ui::label(g,status,{x+24,512,w-48,24},12,phase==CodecPhase::Failed?ui::accent:ui::muted);
- ui::label(g,tr(L"Die Installation erfolgt nur für deinen Benutzer. Keine Administratorrechte nötig. Proprietäre Projektformate und PDF können zusätzliche Komponenten benötigen."),{x,554,w,66},13,ui::muted,false,false,true);
+ ui::label(g,tr(L"Die Installation erfolgt nur für deinen Benutzer. Keine Administratorrechte nötig. Proprietäre Projektformate und PDF können zusätzliche Komponenten benötigen."),{x,608,w,66},13,ui::muted,false,false,true);
 }
 void trimHistory(std::vector<EditState>& history){size_t bytes=0;for(const auto& state:history)if(state.picture)bytes+=state.picture->pixels.size();while(history.size()>1&&(bytes>192u*1024*1024||history.size()>20)){bytes-=history.front().picture->pixels.size();history.erase(history.begin());}}
 void queueEdit(const paf::EditOptions& options){if(!app.picture||app.busy||app.editBusy||app.exporting)return;EditState before{app.picture,app.rotation,app.mirrored};app.undo.push_back(before);trimHistory(app.undo);app.redo.clear();app.editBusy=true;app.exportNotice=false;app.notice.clear();
@@ -1256,10 +1260,14 @@ void command(int id) {
     bool loaded=bool(app.picture)&&!app.busy&&!app.editBusy;
     switch(id) {
     case RestoreHidden:app.preferences.hidden.clear();app.saveSettings();app.rebuildLibrary();break;
+    case CodecCatalog:showDecoderCatalog(app.window,ui::background.ToCOLORREF(),ui::text.ToCOLORREF());break;
+    case GhostscriptDownload:ShellExecuteW(app.window,L"open",L"https://ghostscript.com/releases/gsdnld.html",nullptr,nullptr,SW_SHOWNORMAL);break;
+    case WindowsCodecs:ShellExecuteW(app.window,L"open",L"ms-windows-store://search/?query=image%20extensions",nullptr,nullptr,SW_SHOWNORMAL);break;
+    case CodecDocs:ShellExecuteW(app.window,L"open",L"https://imagemagick.org/script/formats.php",nullptr,nullptr,SW_SHOWNORMAL);break;
     case DecoderPage:app.decoderPage=true;app.gallery=true;app.settings=false;app.helpPage=-1;break;
     case InstallCodecs:app.codecs.start(app.window,CodecDone,FOTO_VERSION_STRING);refresh();return;
     case Edit:if(loaded&&!app.exporting){if(app.testing)app.editing=!app.editing;else {auto source=std::make_shared<Picture>(*app.picture);if(app.mirrored)foto::orientBGRA(source->pixels,source->width,source->height,2);foto::orientBGRA(source->pixels,source->width,source->height,app.rotation==1?6:app.rotation==2?3:app.rotation==3?8:1);
- PhotoEditorStyle style{ui::background.ToCOLORREF(),ui::surface.ToCOLORREF(),ui::text.ToCOLORREF(),ui::muted.ToCOLORREF(),ui::accent.ToCOLORREF(),app.preferences.radius,app.preferences.animations};auto result=showPhotoEditor(app.window,source,app.files[app.index],style);if(result.picture){app.undo.push_back({app.picture,app.rotation,app.mirrored});trimHistory(app.undo);app.redo.clear();app.picture=app.savedPicture=result.picture;app.rotation=0;app.mirrored=false;app.lastExport=result.saved;app.exportNotice=true;app.fit=true;app.rebuildLibrary();}app.editing=false;}}break;
+ PhotoEditorStyle style{ui::background.ToCOLORREF(),ui::surface.ToCOLORREF(),ui::text.ToCOLORREF(),ui::muted.ToCOLORREF(),ui::accent.ToCOLORREF(),app.preferences.radius,app.preferences.animations,ui::raised.ToCOLORREF()};auto result=showPhotoEditor(app.window,source,app.files[app.index],style);if(result.picture){app.undo.push_back({app.picture,app.rotation,app.mirrored});trimHistory(app.undo);app.redo.clear();app.picture=app.savedPicture=result.picture;app.rotation=0;app.mirrored=false;app.lastExport=result.saved;app.exportNotice=true;app.fit=true;app.rebuildLibrary();}app.editing=false;}}break;
     case SaveEdits:command(Export);return;
     case Minimize:ShowWindow(app.window,SW_MINIMIZE);return;
     case Maximize:ShowWindow(app.window,IsZoomed(app.window)?SW_RESTORE:SW_MAXIMIZE);return;
@@ -1346,6 +1354,7 @@ void command(int id) {
 LRESULT CALLBACK wndProc(HWND window,UINT message,WPARAM wp,LPARAM lp) {
     switch(message) {
     case WM_NCACTIVATE:return TRUE;
+    case WM_NCPAINT:return 0;
     case WM_NCCALCSIZE:
         if(wp)return 0;break;
     case WM_NCHITTEST:{
@@ -1661,6 +1670,7 @@ int selfTest(const fs::path& report) {
             paf::EditOptions crop;crop.cropW=1;crop.cropH=1;queueEdit(crop);pump();success &=check(app.picture&&app.picture->width==1&&app.picture->height==1,"Editor crop changes actual raster dimensions");paf::EditOptions resize;resize.width=2;resize.height=3;queueEdit(resize);pump();success &=check(app.picture&&app.picture->width==2&&app.picture->height==3,"Editor resize processes pixels in background");
             auto editOutput=outputs/L"edited-copy.png";bool editSaved=app.exportCopy(editOutput,ExportFormat::PNG);pump();auto editDecoded=wicLoad(editOutput);success &=check(editSaved&&editDecoded.image&&editDecoded.image->width==2&&editDecoded.image->height==3&&updateHash(contextPath)==sourceHash,"Saved edited copy decodes correctly and original remains unchanged");
             success &=check(!(GetWindowLongW(window,GWL_STYLE)&WS_CAPTION),"Custom window frame has no duplicate native caption buttons");
+            auto catalog=decoderCatalog();success &=check(catalog.find(L"PNG")!=std::wstring::npos&&catalog.find(L"JPEG")!=std::wstring::npos&&(magickPath().empty()||catalog.find(L"AVIF")!=std::wstring::npos),"Complete built-in, registered WIC and installed ImageMagick decoder catalog");
             success &=check(photoEditorSelfTest(window),"Full photo editor: adjustments, undo, crop, brush, background removal, thumbnails and actual PNG export");
             success &=check(paf::resizeDialogSelfTest(window),"Resize dialog locks aspect ratio, rejects invalid sizes and accepts exact pixel dimensions");
             command(Edit);command(DecoderPage);success &=check(app.decoderPage&&!IsWindowVisible(app.viewport)&&IsWindowVisible(app.controls[InstallCodecs].window),"Decoder sidebar opens package management without overlapping gallery viewport");success &=check(IsWindowEnabled(app.controls[InstallCodecs].window),"Decoder pack installation remains actionable when codecs are already available");command(Gallery);
