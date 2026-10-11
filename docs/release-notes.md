@@ -16,3 +16,5 @@ Download **setup.exe** for a per-user installation with codecs, Start menu short
 Windows UI and conversion tests, actual codec pixel tests, silent install/uninstall checks and checksums accompany the release. Recognized extensions are not a promise that every proprietary project format can be decoded; see the format guide. Animation and multipage viewing still show the first frame/page.
 
 The optional **PhotoVLC-Codec-Sources.zip** contains corresponding source archives and license information for the bundled codec runtime; it is not needed to run the app.
+
+Image conversion runs in the background; viewing controls stay responsive during encoding.

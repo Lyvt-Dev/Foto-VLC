@@ -70,7 +70,10 @@ jobs:
         run: |
           $report = Join-Path $pwd 'build/windows-self-test.txt'
           $process = Start-Process -FilePath 'build/Release/PhotoVLC.exe' -ArgumentList @('--self-test', $report) -Wait -PassThru
-          if (Test-Path $report) { Get-Content $report }
+          if (Test-Path $report) {
+            Get-Content $report
+            Get-Content $report | Where-Object { $_ -match '^FAIL' } | ForEach-Object { Write-Output "::error::$_" }
+          }
           if ($process.ExitCode -ne 0) { throw "Windows self-test failed: $($process.ExitCode)" }
           if (!(Test-Path $report)) { throw 'Missing Windows self-test report' }
       - name: Package portable app

@@ -6,6 +6,7 @@ namespace foto {inline std::atomic<bool> english{false};}
 inline const wchar_t* tr(const wchar_t* german){
     if(!foto::english.load())return german;
     static const std::map<std::wstring,const wchar_t*> translations={
+        {L"Bild wird konvertiert …",L"Converting image …"},{L"Konvertierung fehlgeschlagen",L"Conversion failed"},
         {L"Strg + S",L"Ctrl + S"},{L"Strg + C",L"Ctrl + C"},
         {L"Konvertieren",L"Convert"},
         {L"Als anderes Format speichern (Strg+S)",L"Save in another format (Ctrl+S)"},

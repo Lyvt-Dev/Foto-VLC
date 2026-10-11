@@ -18,7 +18,7 @@ Bildnachweise für die gezeigten Testfotos: [docs/screenshots.md](docs/screensho
 
 ## Download
 
-Unter [Releases](https://github.com/Lyvt-Dev/Foto-VLC/releases) gibt es
+Unter [Releases](https://github.com/Lyvt-Dev/Photo-VLC/releases) gibt es
 `setup.exe` für eine Installation ohne Administratorrechte mit Codecs, Startmenü-Eintrag,
 optionalem Desktop-Symbol und „Öffnen mit“-Registrierung. Alternativ gibt es
 `PhotoVLC-Windows-x64.zip` als vollständige portable App mit zusätzlichen Decodern.
@@ -194,3 +194,5 @@ Payload wie die portable ZIP. Er prüft eine stille Installation, den installier
 Codec-Pfad, die „Öffnen mit“-Registrierung und eine stille Deinstallation.
 Die Anwendung legt Einstellungen getrennt unter `%LOCALAPPDATA%\PhotoVLC` ab;
 diese bleiben bei der Deinstallation erhalten.
+
+Image conversion runs in the background; viewing controls stay responsive during encoding.

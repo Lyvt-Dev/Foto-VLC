@@ -25,7 +25,7 @@
 #include <set>
 #include <cmath>
 using namespace Gdiplus;
-constexpr UINT Done=WM_APP+1,ThumbDone=WM_APP+2;
+constexpr UINT Done=WM_APP+1,ThumbDone=WM_APP+2,ExportDone=WM_APP+3;
 constexpr wchar_t AppClass[]=L"PhotoVLC.Main";
 constexpr wchar_t AppTitle[]=L"Photo VLC · " FOTO_VERSION_WSTRING;
 enum Action {
@@ -112,6 +112,8 @@ struct Preferences {
     }
 };
 struct Job {fs::path path;unsigned serial;};
+struct ExportJob{std::shared_ptr<Picture> picture;fs::path original,target;ExportFormat format;int rotation;bool mirrored;unsigned quality;};
+struct ExportResult{fs::path target;bool saved;};
 struct Completion {unsigned serial;Decode decoded;};
 struct ThumbJob {fs::path path;unsigned folder;};
 struct ThumbResult {fs::path path;unsigned folder;std::shared_ptr<Picture> picture;};
@@ -153,7 +155,7 @@ struct App {
     std::shared_ptr<Picture> picture;
     std::wstring error,fileSize,fileDate,notice;
     bool busy=false,info=false,strip=true,fullscreen=false,slideshow=false,fit=true,dragging=false,testing=false;
-    bool mirrored=false;
+    bool mirrored=false,exporting=false;
     int rotation=0,helpPage=-1,hover=0;
     double zoom=1,panX=0,panY=0;
     POINT drag{};
@@ -166,6 +168,8 @@ struct App {
     std::mutex mutex;
     std::condition_variable cv;
     std::optional<Job> queued;
+    std::optional<ExportJob> queuedExport;
+    std::optional<ExportResult> exported;
     std::optional<Completion> completed;
     std::deque<ThumbJob> thumbQueue;
     std::deque<ThumbResult> thumbResults;
@@ -212,17 +216,22 @@ struct App {
         worker=std::thread([this]{
             HRESULT initialized=CoInitializeEx(nullptr,COINIT_MULTITHREADED);
             for(;;) {
-                std::optional<Job> task;std::optional<ThumbJob> preview;
+                std::optional<Job> task;std::optional<ThumbJob> preview;std::optional<ExportJob> conversion;
                 {std::unique_lock<std::mutex> lock(mutex);
-                 cv.wait(lock,[this]{return stopping||queued.has_value()||!thumbQueue.empty();});
+                 cv.wait(lock,[this]{return stopping||queued.has_value()||queuedExport.has_value()||!thumbQueue.empty();});
                  if(stopping)break;
                  if(queued){task=*queued;queued.reset();}
+                 else if(queuedExport){conversion=std::move(queuedExport);queuedExport.reset();}
                  else{preview=thumbQueue.front();thumbQueue.pop_front();}}
                 if(task) {
                     Decode result;
                     try {result=load(task->path);}catch(const std::exception&){result.error=tr(L"Die Datei konnte nicht vollständig gelesen werden.");}
                     {std::lock_guard<std::mutex> lock(mutex);if(stopping)break;completed=Completion{task->serial,std::move(result)};}
                     PostMessageW(window,Done,0,0);
+                } else if(conversion){
+                    bool saved=false;try{saved=exportPicture(*conversion->picture,conversion->original,conversion->target,conversion->format,conversion->rotation,conversion->mirrored,conversion->quality);}catch(const std::exception&){}
+                    {std::lock_guard<std::mutex> lock(mutex);if(stopping)break;exported=ExportResult{conversion->target,saved};}
+                    PostMessageW(window,ExportDone,0,0);
                 } else {
                     std::shared_ptr<Picture> result;
                     try {result=thumbnail(preview->path);}catch(const std::exception&){}
@@ -233,8 +242,14 @@ struct App {
             if(SUCCEEDED(initialized))CoUninitialize();
         });
     }
+    bool exportCopy(const fs::path& target,ExportFormat format){
+        if(exporting||!picture||busy||files.empty())return false;
+        exporting=true;notice=tr(L"Bild wird konvertiert …");KillTimer(window,3);
+        {std::lock_guard<std::mutex> lock(mutex);queuedExport=ExportJob{picture,files[index],target,format,rotation,mirrored,unsigned(preferences.quality)};}
+        cv.notify_one();return true;
+    }
     void shutdown() {
-        {std::lock_guard<std::mutex> lock(mutex);stopping=true;queued.reset();thumbQueue.clear();}
+        {std::lock_guard<std::mutex> lock(mutex);stopping=true;queued.reset();queuedExport.reset();thumbQueue.clear();}
         cv.notify_one();if(worker.joinable())worker.join();
     }
     void resetFolder() {
@@ -483,7 +498,7 @@ void layoutControls() {
     }else if(app.settings) {layoutSettingsControls();
     }else if(app.gallery||!file) {layoutGalleryControls();
     }else {
-        place(Export,{62,74,136,30},tr(L"Konvertieren"),Icon::Convert,loaded,false,true,tr(L"Als anderes Format speichern (Strg+S)"));
+        place(Export,{62,74,136,30},tr(L"Konvertieren"),Icon::Convert,loaded&&!app.exporting,false,true,tr(L"Als anderes Format speichern (Strg+S)"));
         place(Mirror,{210,74,38,30},tr(L"Spiegeln"),Icon::Mirror,loaded,app.mirrored,false,tr(L"Horizontal spiegeln (M)"));
         place(Home,{18,75,32,28},tr(L"Startseite"),Icon::Home,true,false,false,tr(L"Zur Startseite"));
         place(Strip,{w-250,74,126,30},tr(L"Filmstreifen"),Icon::Strip,true,app.strip,false,tr(L"Filmstreifen anzeigen oder ausblenden (T)"));
@@ -899,7 +914,7 @@ void choose(bool folder,bool import=false) {
     }
 }
 void chooseExport() {
-    if(!app.picture||app.busy||app.files.empty())return;
+    if(!app.picture||app.busy||app.exporting||app.files.empty())return;
     auto& picture=*app.picture;
     if((picture.originalW>picture.width||picture.originalH>picture.height||picture.frames>1)&&
        MessageBoxW(app.window,tr(L"Exportiert wird das angezeigte Rasterbild mit seinen aktuellen Pixelmaßen. Bei Animationen oder mehrseitigen Dateien nur das erste Bild. Fortfahren?"),tr(L"Bild konvertieren"),MB_OKCANCEL|MB_ICONINFORMATION)!=IDOK)return;
@@ -918,9 +933,7 @@ void chooseExport() {
     auto format=static_cast<ExportFormat>(type-1);target.replace_extension(exportExtension(format));
     std::error_code error;
     if(target!=before&&fs::exists(target,error)&&MessageBoxW(app.window,tr(L"Die Zieldatei existiert bereits. Ersetzen?"),tr(L"Bild konvertieren"),MB_YESNO|MB_ICONQUESTION)!=IDYES)return;
-    bool saved=exportPicture(picture,app.files[app.index],target,format,app.rotation,app.mirrored,unsigned(app.preferences.quality));
-    if(saved){app.notice=tr(L"Kopie gespeichert: ")+target.filename().wstring();app.rebuildLibrary();SetTimer(app.window,3,5000,nullptr);}
-    else MessageBoxW(app.window,tr(L"Speichern fehlgeschlagen. Wähle einen anderen Dateinamen und einen beschreibbaren Ordner. Die Originaldatei kann nicht überschrieben werden."),tr(L"Bild konvertieren"),MB_OK|MB_ICONERROR);
+    app.exportCopy(target,format);
     refresh();
 }
 void copyPath() {
@@ -980,7 +993,7 @@ void command(int id) {
     case ZoomIn:case ZoomOut:if(loaded){auto l=viewLayout();zoomAt(id==ZoomIn?1.25:0.8,l.image.x+l.image.w/2,l.image.y+l.image.h/2);}return;
     case Mirror:if(loaded)app.mirrored=!app.mirrored;break;
     case ResetView:app.rotation=0;app.mirrored=false;app.fit=true;app.panX=app.panY=0;break;
-    case CopyRaster:if(loaded){app.notice=copyPicture(*app.picture,app.rotation,app.mirrored)?tr(L"Bild kopiert"):tr(L"Bild konnte nicht kopiert werden.");SetTimer(app.window,3,2500,nullptr);}break;
+    case CopyRaster:if(loaded){app.notice=copyPicture(*app.picture,app.rotation,app.mirrored,app.window)?tr(L"Bild kopiert"):tr(L"Bild konnte nicht kopiert werden.");SetTimer(app.window,3,2500,nullptr);}break;
     case Export:if(loaded)chooseExport();return;
     case Rotate:if(loaded){app.rotation=(app.rotation+1)%4;app.panX=app.panY=0;}break;
     case Info:app.info=!app.info;app.saveSettings();break;
@@ -1038,8 +1051,8 @@ void command(int id) {
         }break;
     case CopyPath:copyPath();break;
     case ClearRecent:app.preferences.recent.clear();app.rebuildLibrary();app.saveSettings();break;
-    case ReleasePage:ShellExecuteW(app.window,L"open",app.helpPage==2?L"https://github.com/Lyvt-Dev/Foto-VLC/blob/main/docs/formats.md":L"https://github.com/Lyvt-Dev/Foto-VLC/releases",nullptr,nullptr,SW_SHOWNORMAL);break;
-    case SourcePage:ShellExecuteW(app.window,L"open",L"https://github.com/Lyvt-Dev/Foto-VLC",nullptr,nullptr,SW_SHOWNORMAL);break;
+    case ReleasePage:ShellExecuteW(app.window,L"open",app.helpPage==2?L"https://github.com/Lyvt-Dev/Photo-VLC/blob/main/docs/formats.md":L"https://github.com/Lyvt-Dev/Photo-VLC/releases",nullptr,nullptr,SW_SHOWNORMAL);break;
+    case SourcePage:ShellExecuteW(app.window,L"open",L"https://github.com/Lyvt-Dev/Photo-VLC",nullptr,nullptr,SW_SHOWNORMAL);break;
     case ErrorDetails:MessageBoxW(app.window,app.error.c_str(),tr(L"Warum kann dieses Bild nicht geöffnet werden?"),MB_OK|MB_ICONINFORMATION);break;
     }
     refresh();
@@ -1094,6 +1107,13 @@ LRESULT CALLBACK wndProc(HWND window,UINT message,WPARAM wp,LPARAM lp) {
             if(app.picture&&!app.files.empty()){app.preferences.remember(app.files[app.index]);app.rebuildLibrary();app.saveSettings();}
             refresh();
         }return 0;
+    }
+    case ExportDone:{
+        std::optional<ExportResult> result;{std::lock_guard<std::mutex> lock(app.mutex);result=std::move(app.exported);app.exported.reset();}
+        app.exporting=false;
+        if(result&&result->saved){app.notice=tr(L"Kopie gespeichert: ")+result->target.filename().wstring();app.rebuildLibrary();}
+        else {app.notice=tr(L"Konvertierung fehlgeschlagen");MessageBoxW(window,tr(L"Speichern fehlgeschlagen. Wähle einen anderen Dateinamen und einen beschreibbaren Ordner. Die Originaldatei kann nicht überschrieben werden."),tr(L"Bild konvertieren"),MB_OK|MB_ICONERROR);}
+        SetTimer(window,3,5000,nullptr);refresh();return 0;
     }
     case ThumbDone: {
         std::deque<ThumbResult> results;
@@ -1240,7 +1260,7 @@ int selfTest(const fs::path& report) {
             app.openPath(temp.path/L"Bilder ü 日本語.png");
             auto pump=[&]{
                 DWORD start=GetTickCount();
-                while(app.busy && GetTickCount()-start<5000) {
+                while((app.busy||app.exporting) && GetTickCount()-start<5000) {
                     MSG message;while(PeekMessageW(&message,nullptr,0,0,PM_REMOVE)){dispatchMessage(message);}
                     Sleep(10);
                 }
@@ -1248,6 +1268,10 @@ int selfTest(const fs::path& report) {
             };
             pump();
             success &=check(app.picture && !app.busy && app.error.empty(),"Asynchronous desktop image load");
+            auto asynchronousCopy=outputs/L"background.webp";bool conversionQueued=app.exportCopy(asynchronousCopy,ExportFormat::WebP);refresh();
+            success &=check(conversionQueued&&app.exporting&&!IsWindowEnabled(app.controls[Export].window),"Conversion queues in background and disables duplicate export");
+            command(Mirror);pump();command(Mirror);auto asynchronousDecoded=embeddedLoad(asynchronousCopy);
+            success &=check(!app.exporting&&asynchronousDecoded.image&&asynchronousDecoded.image->width==2,"Background conversion completes while controls remain usable");
             success &=check(app.files.size()>=5,"Folder image discovery");
             auto two=std::find(app.files.begin(),app.files.end(),temp.path/L"Bild 2.png");
             auto ten=std::find(app.files.begin(),app.files.end(),temp.path/L"Bild 10.png");
