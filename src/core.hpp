@@ -14,7 +14,7 @@ inline std::vector<std::string> extensions() {
         "psd psb psdc ai eps epsf epsi pdf indd idml xcf kra ora ase aseprite afphoto afdesign cdr cdt cmx cpt pdn procreate sketch fig fh fh3 fh4 fh5 fh7 fh8 fh9 fh10 fh11 "
         "ps emf emf+ wmf cgm dxf dwg odg sxd vsd vsdx wpg hpgl plt "
         "pcx pcc tga targa iff ilbm lbm pbm pgm ppm pnm pam pfm xbm xpm xwd ras sun rgb rgba bw sgi pic pict pct mac msp cut dcx pcd fpx pxr ota wbmp art viff vif miff mpc mng jng jp2 j2k j2c jpc jpf jpx jpm mj2 bpg flif qoi "
-        "dds ktx ktx2 pvr astc atf vtf vmt wal wad iwi blp bli bti bnr tpl tim tim2 gim gxt gtf gnf tex texture tex0 bntx bflim bclim gtx swf";
+        "dds ktx ktx2 pvr astc atf vtf vmt wal wad iwi blp bli bti bnr tpl tim tim2 gim gxt gtf gnf tex texture tex0 bntx bflim bclim gtx swf exr";
     std::vector<std::string> result;
     for (size_t i=0; i<list.size();) {
         auto end=list.find(' ',i);

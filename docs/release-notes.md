@@ -15,6 +15,6 @@ Photo VLC 0.3.0 introduces a photo gallery and a Windows-inspired interface base
 
 Windows UI tests cover gallery search, selection, favorites, English/German switching, settings persistence, themes and 100/150/200% display scaling. Additional codec tests check real decoded pixels and gallery previews. Test reports and checksums are included with this release.
 
-**Format boundaries:** 194 recognized file extensions do not mean 194 fully supported formats. Proprietary design/CAD projects and game containers remain dependent on available readers. RAW support depends on camera/model. PDF/EPS/PS need Ghostscript. Animations and multipage files currently show the first image. The EXE is not code-signed.
+**Format boundaries:** 195 recognized file extensions (including all 194 requested extensions and EXR) do not mean 195 fully supported formats. Proprietary design/CAD projects and game containers remain dependent on available readers. RAW support depends on camera/model. PDF/EPS/PS need Ghostscript. Animations and multipage files currently show the first image. The EXE is not code-signed.
 
 PhotoVLC-Codec-Sources.zip provides the corresponding source/build trees for the included third-party codec runtime; it is not needed to run Photo VLC.

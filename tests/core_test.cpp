@@ -14,7 +14,8 @@ int main() {
     CHECK(!foto::recognized("readme.txt"));
     CHECK(foto::nativeFormat("jpeg"));
     CHECK(!foto::nativeFormat("afphoto"));
-    CHECK(foto::extensions().size()==194);
+    CHECK(foto::extensions().size()==195);
+    CHECK(foto::recognized("HDR-image.EXR"));
     CHECK(foto::quote(L"a b")==L"\"a b\"");
     CHECK(foto::quote(L"a\"b")==L"\"a\\\"b\"");
     CHECK(foto::quote(L"C:\\folder\\")==L"\"C:\\folder\\\\\"");

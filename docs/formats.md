@@ -2,7 +2,7 @@
 
 **Neu in 0.3.0:** WebP ist eingebaut. Im vollständigen ZIP wurden außerdem AVIF, HEIC, JXL, JP2, EXR, DDS und PCX mit echten Dateien und Galerie-Vorschaubildern geprüft. Weitere Varianten bleiben decoderabhängig.
 
-Alle **194 unterschiedlichen Endungen** der Anfrage sind erfasst. Das vollständige ZIP enthält zusätzliche Decoder (siehe [codecs.md](codecs.md)). Die App prüft
+Alle **194 unterschiedlichen Endungen** der Anfrage sowie zusätzlich **EXR** sind erfasst (195 insgesamt). Das vollständige ZIP enthält zusätzliche Decoder (siehe [codecs.md](codecs.md)). Die App prüft
 zuerst den Dateiinhalt mit Windows WIC, dann die eingebetteten Decoder und
 anschließend – sofern installiert – ImageMagick. Eine Endung ist kein Codec.
 
@@ -76,6 +76,7 @@ enthalten. `.emf+` bezeichnet oft Inhalt innerhalb einer EMF-Datei.
 | `.epsf` | Optional / nicht zugesichert: installierter WIC-Codec oder ImageMagick |
 | `.epsi` | Optional / nicht zugesichert: installierter WIC-Codec oder ImageMagick |
 | `.erf` | Optional / nicht zugesichert: installierter WIC-Codec oder ImageMagick |
+| `.exr` | Im vollständigen ZIP geprüft: ImageMagick/OpenEXR |
 | `.fff` | Optional / nicht zugesichert: installierter WIC-Codec oder ImageMagick |
 | `.fh` | Nicht nativ unterstützt; externer Decoder nicht zugesichert |
 | `.fh10` | Nicht nativ unterstützt; externer Decoder nicht zugesichert |
