@@ -1128,7 +1128,7 @@ void editingCommand(int id){if(!app.picture||app.busy||app.editBusy||app.exporti
  paf::EditOptions options;
  switch(id){case BrightDown:options.brightness=-10;break;case BrightUp:options.brightness=10;break;case ContrastDown:options.contrast=.9;break;case ContrastUp:options.contrast=1.1;break;case SaturationDown:options.saturation=.8;break;case SaturationUp:options.saturation=1.2;break;case Grayscale:options.saturation=0;break;case Sepia:options.sepia=true;break;
  case Resize:{unsigned w=app.rotation%2?app.picture->height:app.picture->width,h=app.rotation%2?app.picture->width:app.picture->height;
- auto size=paf::showResizeDialog(app.window,w,h,ui::surface.ToCOLORREF(),ui::text.ToCOLORREF());if(!size)return;options.width=size->first;options.height=size->second;break;}
+ auto size=paf::showResizeDialog(app.window,w,h,ui::surface.ToCOLORREF(),ui::text.ToCOLORREF(),app.preferences.radius);if(!size)return;options.width=size->first;options.height=size->second;break;}
  case Crop:{HMENU menu=CreatePopupMenu();const wchar_t* crops[]={L"1:1",L"4:3",L"16:9",L"3:4"};for(int i=0;i<4;++i)AppendMenuW(menu,MF_STRING,i+1,crops[i]);RECT bounds{};GetWindowRect(app.controls[id].window,&bounds);int choice=int(TrackPopupMenu(menu,TPM_RETURNCMD,bounds.left,bounds.bottom,0,app.window,nullptr));DestroyMenu(menu);if(choice<1||choice>4)return;
   unsigned w=app.rotation%2?app.picture->height:app.picture->width,h=app.rotation%2?app.picture->width:app.picture->height;
   double ratios[]={1.0,4.0/3,16.0/9,3.0/4};double ratio=ratios[choice-1];options.cropW=std::max(1u,std::min(w,unsigned(std::floor(h*ratio))));options.cropH=std::max(1u,std::min(h,unsigned(std::floor(w/ratio))));options.cropX=(w-options.cropW)/2;options.cropY=(h-options.cropH)/2;break;}
