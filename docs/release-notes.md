@@ -2,7 +2,7 @@
 
 - Editor buttons paint their full pixel bounds with no native square outlines or stale corner pixels.
 - Trackbars suppress native theme painting and repaint their entire buffered surface on position and focus changes, avoiding duplicate thumb rings and movement trails.
-- Keep keyboard navigation and native slider interaction; match the surrounding canvas or sidebar background.
+- Slider pointer input uses the same geometry as the visible knob, fixing missed drags and incorrect positions. Keep keyboard navigation, capture release, and sidebar wheel scrolling; match the surrounding canvas or sidebar background.
 - Add native rendering regressions for button edges and incremental slider painting, and validate fix-version update ordering.
 - This release is named `0.7.2-fix`. Install it manually from `setup.exe`: older releases accept numeric-only update manifests. This fix accepts both numeric releases and the `-fix` suffix for subsequent updates.
 
