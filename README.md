@@ -8,6 +8,11 @@ C++17. Dunkle Oberfläche, keine Browser-Runtime, kein Account und keine Telemet
 > Dateifilter erfasst; die tatsächliche Unterstützung steht in
 > [docs/formats.md](docs/formats.md).
 
+![Foto VLC mit geöffnetem Bild](docs/screenshot.png)
+
+Die Abbildung zeigt den tatsächlichen Windows-Build unter Wine mit einer
+eigens erzeugten Testillustration.
+
 ## Download
 
 Unter [Releases](https://github.com/Lyvt-Dev/Foto-VLC/releases) gibt es nach einem
