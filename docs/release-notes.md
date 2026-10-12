@@ -2,8 +2,8 @@
 
 - Add a native C++/Qt 6 Linux desktop with the shared Windows image-editing engine and PAF styling.
 - Include gallery/favorites, folder imports, context-menu deletion/Trash, viewer/filmstrip, editor, customizable settings, decoder catalog, English/German, and Linux AppImage update verification.
-- Publish portable x86-64 AppImage and Debian/Ubuntu packages alongside the existing Windows installer. Both platforms report 0.7.4; their updater manifests and packages remain separate.
-- Exercise real Linux decoder fixtures, all five output formats, transparent backgrounds, full-resolution commit, undo/redo, package startup and the published Linux update download.
+- Publish x86-64 installer AppImage and Debian/Ubuntu packages alongside the existing Windows installer. Both platforms report 0.7.4; their updater manifests and packages remain separate.
+- Exercise real Linux decoder fixtures, all five output formats, actual AppImage installation/uninstallation, transparent backgrounds, full-resolution commit, undo/redo, package startup and the published Linux update download.
 - Desktop-provided window borders/dialogs differ by Linux desktop; proprietary formats and camera variants remain decoder-dependent. See docs/linux.md.
 
 # 0.7.3

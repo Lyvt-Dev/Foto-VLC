@@ -226,6 +226,6 @@ Downloads; sie ersetzen keine digitale Herausgebersignatur.
 ## Linux
 
 Es gibt jetzt eine native C++/Qt-6-Version für Linux mit dem gemeinsamen Bildkern.
-Downloads: **PAFPhotos-Linux-x86_64.AppImage** und **PAFPhotos-Linux-x86_64.deb**
+Downloads: **PAFPhotos-Linux-x86_64.AppImage** (mit Installer) und **PAFPhotos-Linux-x86_64.deb**
 im [Release v0.7.4](https://github.com/Lyvt-Dev/PAF-Photos/releases/tag/v0.7.4).
 Installation, Funktionsumfang, Decoder, Updates und Build: [Linux-Anleitung](docs/linux.md).

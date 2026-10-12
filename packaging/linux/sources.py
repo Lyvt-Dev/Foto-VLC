@@ -1,12 +1,45 @@
 #!/usr/bin/env python3
 """Archive exact distribution sources for the runtime packages recorded in the AppImage."""
-import os, pathlib, subprocess, tarfile, json, hashlib, shutil, urllib.request
+import os, pathlib, subprocess, tarfile, json, hashlib, shutil, urllib.request, urllib.parse, email
 root=pathlib.Path(__file__).resolve().parents[2];out=root/'dist/linux';directory=out/'sources';directory.mkdir(parents=True,exist_ok=True)
 packages=set()
 for line in (out/'linux-dependencies.tsv').read_text().splitlines()[1:]:
  fields=line.split('\t')
  if len(fields)==4 and fields[2] and fields[3]:packages.add(fields[2]+'='+fields[3])
-for package in sorted(packages):subprocess.run(['apt-get','source','--download-only',package],cwd=directory,check=True)
+def archived_source(package):
+ name,version=package.split('=',1)
+ base='https://launchpad.net/ubuntu/+archive/primary/+sourcefiles/'+urllib.parse.quote(name,safe='')+'/'+urllib.parse.quote(version,safe='')+'/'
+ filename=name+'_'+version.split(':')[-1]+'.dsc'
+ with urllib.request.urlopen(base+urllib.parse.quote(filename,safe=''),timeout=60) as response:
+  if not response.geturl().startswith('https://'):raise ValueError('Source metadata redirected outside HTTPS')
+  data=response.read(1024*1024)
+ text=data.decode('utf-8')
+ if text.startswith('-----BEGIN PGP SIGNED MESSAGE-----'):text=text.split('\n\n',1)[1].split('-----BEGIN PGP SIGNATURE-----',1)[0]
+ metadata=email.message_from_string(text)
+ if metadata['Source']!=name or metadata['Version']!=version:raise ValueError('Archived source identity mismatch')
+ (directory/filename).write_bytes(data)
+ records=metadata['Checksums-Sha256']
+ if not records:raise ValueError('Archived source has no SHA256 metadata')
+ for line in records.strip().splitlines():
+  expected,size,filename=line.split();size=int(size)
+  if pathlib.Path(filename).name!=filename or size>512*1024*1024:raise ValueError('Invalid source archive name/size')
+  target=directory/filename
+  if target.exists() and target.stat().st_size==size and hashlib.sha256(target.read_bytes()).hexdigest()==expected:continue
+  partial=target.with_suffix(target.suffix+'.part');digest=hashlib.sha256();count=0
+  with urllib.request.urlopen(base+urllib.parse.quote(filename,safe=''),timeout=120) as response,partial.open('wb') as output:
+   if not response.geturl().startswith('https://'):raise ValueError('Source archive redirected outside HTTPS')
+   while chunk:=response.read(1024*1024):
+    count+=len(chunk)
+    if count>size:raise ValueError('Source archive exceeds signed metadata size')
+    output.write(chunk);digest.update(chunk)
+  if count!=size or digest.hexdigest()!=expected:raise ValueError('Archived source checksum mismatch')
+  partial.replace(target)
+ print('Preserved official Ubuntu archived source',package)
+for package in sorted(packages):
+ if subprocess.run(['/usr/bin/apt-get','source','--download-only',package],cwd=directory).returncode:
+  # Runner libraries may predate the latest source index. Preserve the exact
+  # corresponding signed .dsc and checksum-verified sources from Ubuntu's archive.
+  archived_source(package)
 urllib.request.urlretrieve('https://github.com/AppImage/type2-runtime/archive/8f39b89e2ac31e1640b3d3f7e9a5108e6ce805fa.tar.gz',directory/'appimage-runtime-source.tar.gz')
 jxl_source=os.environ.get('PAF_JXL_SOURCE')
 if jxl_source:

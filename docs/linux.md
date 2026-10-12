@@ -5,8 +5,11 @@ Wine, Electron, a browser, an account or a Windows executable.
 
 ## Downloads
 
-- **PAFPhotos-Linux-x86_64.AppImage**: portable application including Qt,
+- **PAFPhotos-Linux-x86_64.AppImage**: installer AppImage including Qt,
   ImageMagick, JPEG XL, LibRaw, Poppler and Ghostscript readers/delegates.
+  Starts with an installation dialog, copies itself to
+  `~/.local/opt/paf-photos/PAFPhotos.AppImage` and adds app-menu / Open With
+  entries and an uninstaller. No administrator password is needed.
   Intended for glibc-based x86-64 desktop distributions with glibc 2.35 or newer
   (Ubuntu 22.04+, Debian 12+, recent Fedora). Make it executable and start it:
 
@@ -67,7 +70,7 @@ formats remain backend-dependent; recognition of 197 extensions does not mean
 multipage files currently show one frame/page, as on Windows. Local background
 selection and retouch are not generative AI.
 
-Writable AppImages check the Linux-only HTTPS update manifest, verify the complete
+Installed writable AppImages check the Linux-only HTTPS update manifest, verify the complete
 SHA256 before replacement, and apply downloaded updates on exit with a unique
 backup. System-installed DEB applications direct updates to the release/package
 manager rather than writing protected system directories. Windows updater assets
@@ -90,8 +93,9 @@ build/linux/PAFPhotos
 The six existing portable suites remain available with the default CMake
 configuration. `PAF_BUILD_LINUX=ON` explicitly enables the Qt desktop target;
 Windows builds do not acquire a Qt dependency. Package builds use pinned,
-checksum-verified AppImage tooling and runtime binaries. CI starts both the
-AppImage and extracted DEB, runs actual decoder and export checks, and downloads
+checksum-verified AppImage tooling and runtime binaries. CI installs the real AppImage into an isolated user folder, starts it and
+checks uninstall without deleting user photos. It also starts the extracted DEB,
+runs actual decoder and export checks, and downloads
 and verifies the published update asset.
 
 ## Bundled software
