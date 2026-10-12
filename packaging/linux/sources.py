@@ -46,9 +46,9 @@ if jxl_source:
  shutil.copytree(jxl_source,directory/'libjxl-v0.11.1',dirs_exist_ok=True,ignore=shutil.ignore_patterns('.git'))
  (directory/'libjxl-revision.txt').write_text(subprocess.check_output(['git','-C',jxl_source,'rev-parse','HEAD'],text=True)+subprocess.check_output(['git','-C',jxl_source,'submodule','status'],text=True))
 # Qt modules are redistributed dynamically; keep upstream source and distro patches.
-for name in ('src','third_party','assets','packaging'):
+for name in ('src','third_party','assets','packaging','tests','docs'):
  shutil.copytree(root/name,directory/'PAF-Photos'/name,dirs_exist_ok=True)
-for name in ('CMakeLists.txt','LICENSE','THIRD_PARTY_NOTICES.md'):
+for name in ('CMakeLists.txt','LICENSE','THIRD_PARTY_NOTICES.md','README.md','FORMATS.md'):
  if (root/name).exists():shutil.copy2(root/name,directory/'PAF-Photos'/name)
 shutil.copy2(out/'linux-dependencies.tsv',directory/'linux-dependencies.tsv')
 manifest={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in directory.iterdir() if p.is_file()};(directory/'checksums.json').write_text(json.dumps(manifest,indent=2))
