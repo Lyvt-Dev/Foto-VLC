@@ -18,14 +18,16 @@ jobs:
       - name: Install native Linux toolchain and decoder delegates
         run: |
           sudo apt-get update
-          if ! sudo apt-get install -y --no-install-recommends ninja-build qt6-base-dev qt6-image-formats-plugins qt6-wayland imagemagick libmagickcore-6.q16-6-extra libraw-bin libjxl-dev poppler-utils ghostscript libglib2.0-bin libfuse2 desktop-file-utils > /tmp/paf-install.log 2>&1; then
+          if ! sudo apt-get install -y --no-install-recommends ninja-build qt6-base-dev qt6-image-formats-plugins qt6-wayland imagemagick libmagickcore-6.q16-6-extra libraw-bin poppler-utils ghostscript libglib2.0-bin libfuse2 desktop-file-utils > /tmp/paf-install.log 2>&1; then
             grep -E '^E:|Unable to|unmet dependencies|Depends:' /tmp/paf-install.log | while IFS= read -r line; do echo "::error::$line"; done
             tail -n 30 /tmp/paf-install.log
             exit 1
           fi
+      - name: Build pinned native JPEG XL decoder
+        run: bash packaging/linux/build-jxl.sh /tmp/paf-jxl
       - name: Configure and build native app
         run: |
-          cmake -S . -B build/linux -G Ninja -DCMAKE_BUILD_TYPE=Release -DPAF_BUILD_LINUX=ON
+          cmake -S . -B build/linux -G Ninja -DCMAKE_BUILD_TYPE=Release -DPAF_BUILD_LINUX=ON -DCMAKE_PREFIX_PATH=/tmp/paf-jxl/install
           cmake --build build/linux --parallel 4
       - name: Test shared engines and actual Linux GUI paths
         env:
@@ -50,7 +52,7 @@ jobs:
           QT_QPA_PLATFORM: offscreen
           XDG_CONFIG_HOME: /tmp/paf-ci-package-config
         run: |
-          python3 packaging/linux/package.py --appimagetool /tmp/appimagetool.AppImage --runtime-file /tmp/runtime-x86_64
+          PAF_JXL_SOURCE=/tmp/paf-jxl/source LD_LIBRARY_PATH=/tmp/paf-jxl/install/lib python3 packaging/linux/package.py --appimagetool /tmp/appimagetool.AppImage --runtime-file /tmp/runtime-x86_64
           APPIMAGE_EXTRACT_AND_RUN=1 dist/linux/PAFPhotos-Linux-x86_64.AppImage --self-test dist/linux/linux-appimage-self-test.txt
           cat dist/linux/linux-appimage-self-test.txt
           dpkg-deb --info dist/linux/PAFPhotos-Linux-x86_64.deb
@@ -61,7 +63,7 @@ jobs:
         run: |
           awk '/^deb / {sub(/^deb /,"deb-src ");print}' /etc/apt/sources.list | sudo tee /etc/apt/sources.list.d/paf-sources.list >/dev/null
           sudo apt-get update
-          python3 packaging/linux/sources.py
+          PAF_JXL_SOURCE=/tmp/paf-jxl/source python3 packaging/linux/sources.py
       - name: Publish Linux assets beside the existing Windows release
         if: startsWith(github.ref, 'refs/tags/')
         env:

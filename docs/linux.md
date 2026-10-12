@@ -76,10 +76,11 @@ are not used on Linux.
 ## Build and tests
 
 ```sh
-sudo apt install cmake ninja-build g++ qt6-base-dev libjxl-dev \
-  qt6-image-formats-plugins qt6-wayland imagemagick libmagickcore-6.q16-6-extra libraw-bin libjxl-tools \
+sudo apt install cmake ninja-build g++ qt6-base-dev \
+  qt6-image-formats-plugins qt6-wayland imagemagick libmagickcore-6.q16-6-extra libraw-bin \
   poppler-utils ghostscript libglib2.0-bin
-cmake -S . -B build/linux -G Ninja -DCMAKE_BUILD_TYPE=Release -DPAF_BUILD_LINUX=ON
+bash packaging/linux/build-jxl.sh /tmp/paf-jxl
+cmake -S . -B build/linux -G Ninja -DCMAKE_BUILD_TYPE=Release -DPAF_BUILD_LINUX=ON -DCMAKE_PREFIX_PATH=/tmp/paf-jxl/install
 cmake --build build/linux --parallel 4
 ctest --test-dir build/linux --output-on-failure
 QT_QPA_PLATFORM=offscreen build/linux/PAFPhotos --self-test linux-self-test.txt

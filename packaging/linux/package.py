@@ -63,6 +63,12 @@ for docs in pathlib.Path('/usr/share/doc').iterdir():
   if docs.is_dir():shutil.copytree(docs,notices/docs.name,dirs_exist_ok=True,symlinks=False,ignore_dangling_symlinks=True)
 for name in ('LICENSE','THIRD_PARTY_NOTICES.md'):
  if (root/name).exists():shutil.copy2(root/name,notices/name)
+jxl_source=os.environ.get('PAF_JXL_SOURCE')
+if jxl_source:
+ jxl_notice=notices/'libjxl-upstream';jxl_notice.mkdir(exist_ok=True)
+ for source in pathlib.Path(jxl_source).rglob('*'):
+  if source.is_file() and source.name.upper().startswith(('LICENSE','COPYING','PATENTS','AUTHORS')):
+   target=jxl_notice/source.relative_to(jxl_source);target.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(source,target)
 records=[]
 for package in sorted(package_names):
  result=subprocess.run(['dpkg-query','-W','-f=${binary:Package}\t${Version}\t${source:Package}\t${source:Version}\n',package],capture_output=True,text=True)
@@ -98,6 +104,7 @@ shutil.copy2(root/a.build/'PAFPhotos.JXL',debroot/'usr/bin/PAFPhotos.JXL')
 private=debroot/'usr/lib/paf-photos';private.mkdir(parents=True,exist_ok=True)
 for file in libs.iterdir():
  if file.name.startswith(('libjxl','libhwy','libbrotli')):shutil.copy2(file,private/file.name)
+shutil.copytree(notices,debroot/'usr/share/doc/paf-photos',dirs_exist_ok=True)
 (debroot/'usr/share/applications').mkdir(parents=True,exist_ok=True);records=[]
 for package in sorted(package_names):
  result=subprocess.run(['dpkg-query','-W','-f=${binary:Package}\t${Version}\t${source:Package}\t${source:Version}\n',package],capture_output=True,text=True)
