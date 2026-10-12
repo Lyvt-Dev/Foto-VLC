@@ -105,3 +105,8 @@ Qt and other libraries are dynamically linked and replaceable after
 package/source manifest are retained in `usr/share/doc` inside the AppImage.
 `PAFPhotos-Linux-Sources.tar.xz` includes corresponding distribution source
 archives, patches, application source and the pinned AppImage runtime source.
+
+The Linux package build is recorded in `linux-build.json` and in the corresponding
+source archive. The [Linux build tag](https://github.com/Lyvt-Dev/PAF-Photos/tree/linux-v0.7.4)
+keeps the corrected ImageMagick 6 launcher bundled, avoiding interference from
+a newer ImageMagick installation on the host. The app version stays 0.7.4.

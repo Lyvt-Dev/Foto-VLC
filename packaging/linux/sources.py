@@ -51,6 +51,7 @@ for name in ('src','third_party','assets','packaging','tests','docs'):
 for name in ('CMakeLists.txt','LICENSE','THIRD_PARTY_NOTICES.md','README.md','FORMATS.md'):
  if (root/name).exists():shutil.copy2(root/name,directory/'PAF-Photos'/name)
 shutil.copy2(out/'linux-dependencies.tsv',directory/'linux-dependencies.tsv')
+shutil.copy2(out/'linux-build.json',directory/'linux-build.json')
 manifest={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in directory.iterdir() if p.is_file()};(directory/'checksums.json').write_text(json.dumps(manifest,indent=2))
 with tarfile.open(out/'PAFPhotos-Linux-Sources.tar.xz','w:xz') as archive:archive.add(directory,arcname='PAFPhotos-Linux-Sources')
 print('Archived',len(packages),'exact distribution source packages')

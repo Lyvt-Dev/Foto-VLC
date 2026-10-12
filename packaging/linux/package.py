@@ -21,6 +21,10 @@ for qtroot in qtroots:
 for name in ('magick','convert','identify','djxl','dcraw_emu','pdftoppm','gs'):
  src=str(pathlib.Path('/usr/bin')/name) if (pathlib.Path('/usr/bin')/name).is_file() else (shutil.which(name) or str(pathlib.Path(a.qt_root)/'bin'/name))
  if pathlib.Path(src).is_file():shutil.copy2(pathlib.Path(src).resolve(),binary/name)
+# ImageMagick 6 supplies convert, not magick. Keep the preferred name bundled
+# so a newer system magick cannot override our compatible private delegates.
+if not (binary/'magick').exists() and (binary/'convert').exists():
+ shutil.copy2(binary/'convert',binary/'magick')
 for prefix in qtroots:
  for base in (prefix/'lib/x86_64-linux-gnu',prefix/'lib'):
   for module in base.glob('ImageMagick*/modules-*/coders'):
@@ -143,3 +147,5 @@ files=[image,out/'PAFPhotos-Linux-x86_64.deb']
 (out/'linux-SHA256SUMS.txt').write_text(''.join(hashlib.sha256(f.read_bytes()).hexdigest()+'  '+f.name+'\n' for f in files))
 (out/'linux-update.json').write_text(json.dumps(dict(version=version,sha256=hashlib.sha256(image.read_bytes()).hexdigest(),size=image.stat().st_size),separators=(',',':')))
 print('Built',[(f.name,f.stat().st_size) for f in files])
+
+(out/'linux-build.json').write_text(json.dumps(dict(version=version,commit=subprocess.check_output(['git','rev-parse','HEAD'],cwd=root,text=True).strip(),source_ref='linux-v'+version),indent=2))
