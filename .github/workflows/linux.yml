@@ -23,12 +23,25 @@ jobs:
             tail -n 30 /tmp/paf-install.log
             exit 1
           fi
+      - uses: actions/cache/restore@v4
+        id: jxl-cache
+        with:
+          path: /tmp/paf-jxl
+          key: paf-jxl-ubuntu22-x64-v0111-${{ hashFiles('packaging/linux/build-jxl.sh') }}
       - name: Build pinned native JPEG XL decoder
         run: bash packaging/linux/build-jxl.sh /tmp/paf-jxl
+      - uses: actions/cache/save@v4
+        if: steps.jxl-cache.outputs.cache-hit != 'true'
+        with:
+          path: /tmp/paf-jxl
+          key: paf-jxl-ubuntu22-x64-v0111-${{ hashFiles('packaging/linux/build-jxl.sh') }}
       - name: Configure and build native app
         run: |
-          cmake -S . -B build/linux -G Ninja -DCMAKE_BUILD_TYPE=Release -DPAF_BUILD_LINUX=ON -DCMAKE_PREFIX_PATH=/tmp/paf-jxl/install
-          cmake --build build/linux --parallel 4
+          if ! (cmake -S . -B build/linux -G Ninja -DCMAKE_BUILD_TYPE=Release -DPAF_BUILD_LINUX=ON -DCMAKE_PREFIX_PATH=/tmp/paf-jxl/install && cmake --build build/linux --parallel 4) > /tmp/paf-build.log 2>&1; then
+            grep -E 'CMake Error|error:|Could NOT|Could not|not find|required' /tmp/paf-build.log | head -n 30 | while IFS= read -r line; do echo "::error::$line"; done
+            tail -n 60 /tmp/paf-build.log
+            exit 1
+          fi
       - name: Test shared engines and actual Linux GUI paths
         env:
           QT_QPA_PLATFORM: offscreen
