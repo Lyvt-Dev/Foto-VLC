@@ -18,7 +18,7 @@ jobs:
       - name: Install native Linux toolchain and decoder delegates
         run: |
           sudo apt-get update
-          if ! sudo apt-get install -y --no-install-recommends ninja-build qt6-base-dev qt6-svg-dev qt6-image-formats-plugins qt6-wayland imagemagick libmagickcore-6.q16-6-extra libraw-bin libjxl-tools poppler-utils ghostscript libglib2.0-bin libfuse2 desktop-file-utils > /tmp/paf-install.log 2>&1; then
+          if ! sudo apt-get install -y --no-install-recommends ninja-build qt6-base-dev qt6-image-formats-plugins qt6-wayland imagemagick libmagickcore-6.q16-6-extra libraw-bin libjxl-dev poppler-utils ghostscript libglib2.0-bin libfuse2 desktop-file-utils > /tmp/paf-install.log 2>&1; then
             grep -E '^E:|Unable to|unmet dependencies|Depends:' /tmp/paf-install.log | while IFS= read -r line; do echo "::error::$line"; done
             tail -n 30 /tmp/paf-install.log
             exit 1

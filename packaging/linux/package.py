@@ -6,6 +6,7 @@ root=pathlib.Path(__file__).resolve().parents[2];out=(root/a.output).resolve();o
 version=re.search(r'set\(PAF_RELEASE_VERSION "([^\"]+)"\)',(root/'CMakeLists.txt').read_text()).group(1)
 app=out/'PAFPhotos.AppDir';app.mkdir(exist_ok=True);binary=app/'usr/bin';libs=app/'usr/lib';plugins=app/'usr/plugins';binary.mkdir(parents=True,exist_ok=True);libs.mkdir(parents=True,exist_ok=True)
 shutil.copy2(root/a.build/'PAFPhotos',binary/'PAFPhotos')
+shutil.copy2(root/a.build/'PAFPhotos.JXL',binary/'PAFPhotos.JXL')
 original_modules=[]
 qtroots=[pathlib.Path('/usr'),pathlib.Path(a.qt_root)]
 for qtroot in qtroots:
@@ -93,6 +94,10 @@ subprocess.run([str(pathlib.Path(a.appimagetool).resolve()),'--no-appstream','--
 # Debian package uses distribution-maintained libraries and delegates.
 debroot=out/'deb';(debroot/'DEBIAN').mkdir(parents=True,exist_ok=True);(debroot/'usr/bin').mkdir(parents=True,exist_ok=True)
 shutil.copy2(root/a.build/'PAFPhotos',debroot/'usr/bin/PAFPhotos')
+shutil.copy2(root/a.build/'PAFPhotos.JXL',debroot/'usr/bin/PAFPhotos.JXL')
+private=debroot/'usr/lib/paf-photos';private.mkdir(parents=True,exist_ok=True)
+for file in libs.iterdir():
+ if file.name.startswith(('libjxl','libhwy','libbrotli')):shutil.copy2(file,private/file.name)
 (debroot/'usr/share/applications').mkdir(parents=True,exist_ok=True);records=[]
 for package in sorted(package_names):
  result=subprocess.run(['dpkg-query','-W','-f=${binary:Package}\t${Version}\t${source:Package}\t${source:Version}\n',package],capture_output=True,text=True)
@@ -106,13 +111,13 @@ shutil.copy2(root/'packaging/linux/paf-photos.desktop',debroot/'usr/share/applic
 Version: {version}
 Architecture: amd64
 Maintainer: Lyvt-Dev <Lyvt-Dev@users.noreply.github.com>
-Depends: libqt6widgets6, libqt6concurrent6, libqt6network6, libqt6svg6, qt6-image-formats-plugins, imagemagick, libmagickcore-6.q16-6-extra | libmagickcore-7.q16-10-extra, libraw-bin, libjxl-tools, poppler-utils, ghostscript, libglib2.0-bin
+Depends: libqt6widgets6, libqt6concurrent6, libqt6network6, qt6-image-formats-plugins, imagemagick, libmagickcore-6.q16-6-extra | libmagickcore-7.q16-10-extra, libraw-bin, poppler-utils, ghostscript, libglib2.0-bin
 Description: PAF-Photos native photo gallery, editor and converter
  Native C++ Linux photo application with local image editing and broad decoders.
 ''')
 for path in debroot.rglob('*'):
  if path.is_dir():path.chmod(0o755)
- elif path.is_file():path.chmod(0o755 if path.name=='PAFPhotos' else 0o644)
+ elif path.is_file():path.chmod(0o755 if path.name in ('PAFPhotos','PAFPhotos.JXL') else 0o644)
 debroot.chmod(0o755)
 subprocess.run(['dpkg-deb','--build','--root-owner-group',str(debroot),str(out/f'PAFPhotos-Linux-x86_64.deb')],check=True)
 files=[image,out/'PAFPhotos-Linux-x86_64.deb']

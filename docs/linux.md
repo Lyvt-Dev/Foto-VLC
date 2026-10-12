@@ -76,7 +76,7 @@ are not used on Linux.
 ## Build and tests
 
 ```sh
-sudo apt install cmake ninja-build g++ qt6-base-dev qt6-svg-dev \
+sudo apt install cmake ninja-build g++ qt6-base-dev libjxl-dev \
   qt6-image-formats-plugins qt6-wayland imagemagick libmagickcore-6.q16-6-extra libraw-bin libjxl-tools \
   poppler-utils ghostscript libglib2.0-bin
 cmake -S . -B build/linux -G Ninja -DCMAKE_BUILD_TYPE=Release -DPAF_BUILD_LINUX=ON
