@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """Enable corresponding Ubuntu/PPA source indexes, keeping repository signatures."""
 import pathlib,re
-root=pathlib.Path('/etc/apt');official=re.compile(r'ubuntu\.com|launchpad(?:content)?\.net')
+root=pathlib.Path('/etc/apt');official=re.compile(r'ubuntu\.com|launchpad(?:content)?\.net|mirror\+file:\S*/ubuntu[^\s]*\.list')
 for file in [root/'sources.list',*(root/'sources.list.d').glob('*.list')]:
- if not file.exists():continue
+ if not file.exists() or file.name.startswith('paf-source-'):continue
  rows=[]
  for row in file.read_text().splitlines():
   if row.startswith('deb ') and official.search(row):rows.append(re.sub('^deb ','deb-src ',row))
- if rows:(root/'sources.list.d'/('paf-source-'+file.name)).write_text('\n'.join(rows)+'\n')
+ if rows:
+  (root/'sources.list.d'/('paf-source-'+file.name)).write_text('\n'.join(rows)+'\n');print('Enabled source indexes from',file.name,len(rows))
 for file in (root/'sources.list.d').glob('*.sources'):
  blocks=[]
  for block in file.read_text().split('\n\n'):
