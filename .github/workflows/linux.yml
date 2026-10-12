@@ -74,9 +74,11 @@ jobs:
           cat dist/linux/linux-deb-self-test.txt
       - name: Preserve exact bundled dependency sources
         run: |
-          awk '/^deb / {sub(/^deb /,"deb-src ");print}' /etc/apt/sources.list | sudo tee /etc/apt/sources.list.d/paf-sources.list >/dev/null
-          sudo apt-get update
-          PAF_JXL_SOURCE=/tmp/paf-jxl/source python3 packaging/linux/sources.py
+          if ! (sudo python3 packaging/linux/enable-sources.py && sudo apt-get update && PAF_JXL_SOURCE=/tmp/paf-jxl/source python3 packaging/linux/sources.py) > /tmp/paf-sources.log 2>&1; then
+            grep -E '^E:|Error|Traceback|Cannot|Failed|failed|404|403' /tmp/paf-sources.log | tail -n 20 | while IFS= read -r line; do echo "::error::$line"; done
+            tail -n 60 /tmp/paf-sources.log
+            exit 1
+          fi
       - name: Publish Linux assets beside the existing Windows release
         if: startsWith(github.ref, 'refs/tags/')
         env:
