@@ -1,6 +1,6 @@
-; Build: ISCC /DAppVersion=0.7.3 /DPayloadDir=<absolute dist/package> PAFPhotos.iss
+; Build: ISCC /DAppVersion=0.7.4 /DPayloadDir=<absolute dist/package> PAFPhotos.iss
 #ifndef AppVersion
-  #define AppVersion "0.7.3"
+  #define AppVersion "0.7.4"
 #endif
 #ifndef PayloadDir
   #define PayloadDir "..\dist\package"
@@ -9,7 +9,7 @@
 AppId={{B0A6C7F8-7276-4514-BC49-38A23B08A628}
 AppName=PAF-Photos
 AppVersion={#AppVersion}
-VersionInfoVersion=0.7.3.0
+VersionInfoVersion=0.7.4.0
 AppPublisher=Lyvt-Dev
 AppPublisherURL=https://github.com/Lyvt-Dev/PAF-Photos
 AppSupportURL=https://github.com/Lyvt-Dev/PAF-Photos/issues

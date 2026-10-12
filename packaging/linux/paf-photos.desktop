@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=PAF-Photos
+Comment=View, edit and convert images
+Exec=PAFPhotos %f
+Icon=paf-photos
+Terminal=false
+Categories=Graphics;Photography;Viewer;
+MimeType=image/png;image/jpeg;image/bmp;image/gif;image/webp;image/avif;image/heic;image/tiff;image/svg+xml;image/x-dcraw;application/pdf;

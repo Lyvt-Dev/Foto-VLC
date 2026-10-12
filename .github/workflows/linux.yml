@@ -1,0 +1,85 @@
+name: Native Linux desktop
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+    paths: ['src/**', 'tests/**', 'third_party/**', 'packaging/linux/**', 'CMakeLists.txt', '.github/workflows/linux.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  linux:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 40
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install native Linux toolchain and decoder delegates
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ninja-build qt6-base-dev qt6-svg-dev qt6-image-formats-plugins qt6-wayland imagemagick libmagickcore-6.q16-6-extra libraw-bin libjxl-tools poppler-utils ghostscript libglib2.0-bin libfuse2 desktop-file-utils
+      - name: Configure and build native app
+        run: |
+          cmake -S . -B build/linux -G Ninja -DCMAKE_BUILD_TYPE=Release -DPAF_BUILD_LINUX=ON
+          cmake --build build/linux --parallel 4
+      - name: Test shared engines and actual Linux GUI paths
+        env:
+          QT_QPA_PLATFORM: offscreen
+          XDG_CONFIG_HOME: /tmp/paf-ci-config
+        run: |
+          ctest --test-dir build/linux --output-on-failure
+          build/linux/PAFPhotos --self-test build/linux/linux-self-test.txt
+          cat build/linux/linux-self-test.txt
+          if grep -q '^FAIL ' build/linux/linux-self-test.txt; then exit 1; fi
+          build/linux/PAFPhotos --screenshot build/linux/linux-editor.png
+          desktop-file-validate packaging/linux/paf-photos.desktop
+      - name: Obtain verified AppImage packaging tool
+        run: |
+          curl --fail --location --retry 3 https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage -o /tmp/appimagetool.AppImage
+          echo '95cbe7cce9717fce90c484e34052ee7c7f1d7635b33c12525b4776826a7d29b6  /tmp/appimagetool.AppImage' | sha256sum -c -
+          curl --fail --location --retry 3 https://github.com/AppImage/type2-runtime/releases/download/continuous/runtime-x86_64 -o /tmp/runtime-x86_64
+          echo '156f4bdbde9c52d01814600013e0a273f0118dc2de98975f3c8c63427ec79074  /tmp/runtime-x86_64' | sha256sum -c -
+          chmod +x /tmp/appimagetool.AppImage
+      - name: Build and exercise complete portable and Debian packages
+        env:
+          QT_QPA_PLATFORM: offscreen
+          XDG_CONFIG_HOME: /tmp/paf-ci-package-config
+        run: |
+          python3 packaging/linux/package.py --appimagetool /tmp/appimagetool.AppImage --runtime-file /tmp/runtime-x86_64
+          APPIMAGE_EXTRACT_AND_RUN=1 dist/linux/PAFPhotos-Linux-x86_64.AppImage --self-test dist/linux/linux-appimage-self-test.txt
+          cat dist/linux/linux-appimage-self-test.txt
+          dpkg-deb --info dist/linux/PAFPhotos-Linux-x86_64.deb
+          dpkg-deb -x dist/linux/PAFPhotos-Linux-x86_64.deb /tmp/paf-deb-test
+          /tmp/paf-deb-test/usr/bin/PAFPhotos --self-test dist/linux/linux-deb-self-test.txt
+          cat dist/linux/linux-deb-self-test.txt
+      - name: Preserve exact bundled dependency sources
+        run: |
+          awk '/^deb / {sub(/^deb /,"deb-src ");print}' /etc/apt/sources.list | sudo tee /etc/apt/sources.list.d/paf-sources.list >/dev/null
+          sudo apt-get update
+          python3 packaging/linux/sources.py
+      - name: Publish Linux assets beside the existing Windows release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=$(sed -n 's/^set(PAF_RELEASE_VERSION "\([^"]*\)")/\1/p' CMakeLists.txt)
+          for attempt in $(seq 1 20); do if gh release view "v$version" >/dev/null 2>&1; then break; fi; sleep 15; done
+          gh release upload "v$version" dist/linux/PAFPhotos-Linux-x86_64.AppImage dist/linux/PAFPhotos-Linux-x86_64.deb dist/linux/PAFPhotos-Linux-Sources.tar.xz dist/linux/linux-update.json dist/linux/linux-SHA256SUMS.txt dist/linux/linux-dependencies.tsv dist/linux/linux-appimage-self-test.txt dist/linux/linux-deb-self-test.txt --clobber
+      - name: Verify actual published Linux update download
+        env:
+          GH_TOKEN: ${{ github.token }}
+          QT_QPA_PLATFORM: offscreen
+          XDG_CONFIG_HOME: /tmp/paf-ci-published-config
+        run: |
+          build/linux/PAFPhotos --published-update-test dist/linux/linux-published-update-self-test.txt
+          cat dist/linux/linux-published-update-self-test.txt
+          version=$(sed -n 's/^set(PAF_RELEASE_VERSION "\([^"]*\)")/\1/p' CMakeLists.txt)
+          gh release upload "v$version" dist/linux/linux-published-update-self-test.txt --clobber
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: PAFPhotos-Linux-test-results
+          path: |
+            build/linux/linux-self-test.txt
+            build/linux/linux-editor.png
+            dist/linux/*self-test.txt

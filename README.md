@@ -4,7 +4,7 @@ Ein kleiner, nativer Foto-Betrachter für **Windows 10/11 x64**, geschrieben in
 C++17. Galerie mit Suche und Favoriten, deutsche und englische Oberfläche,
 System-/Hell-/Dunkel-Design, keine Browser-Runtime und kein Account.
 
-> **PAF-Photos 0.7.3** ist eine Galerie und ein Foto-Betrachter. Die Unterstützung für jedes
+> **PAF-Photos 0.7.4** ist eine Galerie und ein Foto-Betrachter. Die Unterstützung für jedes
 > Design-, CAD- oder Spieleformat ist noch nicht vollständig. Alle 197 erfassten Endungen sind im
 > Dateifilter erfasst; die tatsächliche Unterstützung steht in
 > [docs/formats.md](docs/formats.md).
@@ -66,7 +66,7 @@ signiert. Die Prüfsumme steht im jeweiligen Release.
 
 Bearbeitung und Export lassen Originaldateien unverändert. Nur die ausdrücklich ausgewählten Aktionen im Galerie-Löschmenü löschen Dateien vom PC.
 GIFs, APNGs und mehrseitige Dateien zeigen die erste decodierbare Seite; Animation
-und Ebenenbearbeitung gehören nicht zu v0.7.3. Die Diashow wechselt zwischen Dateien.
+und Ebenenbearbeitung gehören nicht zu v0.7.4. Die Diashow wechselt zwischen Dateien.
 
 ## Bedienung
 
@@ -222,3 +222,10 @@ Das Repository heißt ebenfalls PAF-Photos.
 Die App übermittelt für Updates nur HTTPS-Anfragen an GitHub und dessen Asset-Server;
 Bilder und Galeriepfade werden nicht übertragen. Prüfsummen schützen vor beschädigten
 Downloads; sie ersetzen keine digitale Herausgebersignatur.
+
+## Linux
+
+Es gibt jetzt eine native C++/Qt-6-Version für Linux mit dem gemeinsamen Bildkern.
+Downloads: **PAFPhotos-Linux-x86_64.AppImage** und **PAFPhotos-Linux-x86_64.deb**
+im [Release v0.7.4](https://github.com/Lyvt-Dev/PAF-Photos/releases/tag/v0.7.4).
+Installation, Funktionsumfang, Decoder, Updates und Build: [Linux-Anleitung](docs/linux.md).
