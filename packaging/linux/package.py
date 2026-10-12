@@ -4,7 +4,9 @@ import argparse, pathlib, shutil, subprocess, os, re, hashlib, json
 p=argparse.ArgumentParser();p.add_argument('--build',default='build/linux');p.add_argument('--output',default='dist/linux');p.add_argument('--appimagetool',required=True);p.add_argument('--runtime-file',required=True);p.add_argument('--qt-root',default='/usr');a=p.parse_args()
 root=pathlib.Path(__file__).resolve().parents[2];out=(root/a.output).resolve();out.mkdir(parents=True,exist_ok=True)
 version=re.search(r'set\(PAF_RELEASE_VERSION "([^\"]+)"\)',(root/'CMakeLists.txt').read_text()).group(1)
-app=out/'PAFPhotos.AppDir';app.mkdir(exist_ok=True);binary=app/'usr/bin';libs=app/'usr/lib';plugins=app/'usr/plugins';binary.mkdir(parents=True,exist_ok=True);libs.mkdir(parents=True,exist_ok=True)
+app=out/'PAFPhotos.AppDir'
+if app.exists():shutil.rmtree(app)
+app.mkdir();binary=app/'usr/bin';libs=app/'usr/lib';plugins=app/'usr/plugins';binary.mkdir(parents=True,exist_ok=True);libs.mkdir(parents=True,exist_ok=True)
 shutil.copy2(root/a.build/'PAFPhotos',binary/'PAFPhotos')
 shutil.copy2(root/a.build/'PAFPhotos.JXL',binary/'PAFPhotos.JXL')
 original_modules=[]
@@ -106,7 +108,9 @@ for path in app.rglob('*'):
 app.chmod(0o755)
 subprocess.run([str(pathlib.Path(a.appimagetool).resolve()),'--no-appstream','--runtime-file',str(pathlib.Path(a.runtime_file).resolve()),str(app),str(image)],env=env,check=True)
 # Debian package uses distribution-maintained libraries and delegates.
-debroot=out/'deb';(debroot/'DEBIAN').mkdir(parents=True,exist_ok=True);(debroot/'usr/bin').mkdir(parents=True,exist_ok=True)
+debroot=out/'deb'
+if debroot.exists():shutil.rmtree(debroot)
+(debroot/'DEBIAN').mkdir(parents=True,exist_ok=True);(debroot/'usr/bin').mkdir(parents=True,exist_ok=True)
 shutil.copy2(root/a.build/'PAFPhotos',debroot/'usr/bin/PAFPhotos')
 shutil.copy2(root/a.build/'PAFPhotos.JXL',debroot/'usr/bin/PAFPhotos.JXL')
 private=debroot/'usr/lib/paf-photos';private.mkdir(parents=True,exist_ok=True)
