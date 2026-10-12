@@ -28,6 +28,14 @@ for prefix in qtroots:
  for folder in ('ghostscript','poppler'):
   source=prefix/'share'/folder
   if source.exists():shutil.copytree(source,app/'usr/share'/folder,dirs_exist_ok=True,ignore_dangling_symlinks=True)
+# Qt 6.2 may load OpenSSL at runtime instead of exposing it through ldd.
+# Keep TLS updates portable on systems with a different OpenSSL installation.
+for prefix in qtroots:
+ for folder in (prefix/'lib/x86_64-linux-gnu',prefix/'lib'):
+  for pattern in ('libssl.so.*','libcrypto.so.*'):
+   for source in folder.glob(pattern):
+    if source.is_file():
+     original_modules.append(source);shutil.copy2(source.resolve(),libs/source.name)
 # Recursively bundle dynamically linked dependencies, excluding host libc/loader.
 exclude=re.compile(r'^(ld-linux|libc\.so|libm\.so|libpthread\.so|libdl\.so|librt\.so|libresolv\.so|libnss_|libutil\.so)')
 seen=set();package_names=set();owners=set();
